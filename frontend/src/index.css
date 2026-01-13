@@ -1,0 +1,237 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== حركة التدرّج الخلفي ===== */
+@keyframes brandGradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ===== حركة اللمعان الذهبي البطيء (Breathing Glow) ===== */
+@keyframes goldGlow {
+  0% { box-shadow: 0 0 8px 2px rgba(244,201,93,0.4), 0 0 20px rgba(212,175,55,0.2); }
+  50% { box-shadow: 0 0 16px 4px rgba(244,201,93,0.8), 0 0 35px rgba(212,175,55,0.35); }
+  100% { box-shadow: 0 0 8px 2px rgba(244,201,93,0.4), 0 0 20px rgba(212,175,55,0.2); }
+}
+
+/* ===== حركة مسار الضوء الذهبي عبر الشاشة ===== */
+@keyframes sweepLight {
+  0%   { background-position: -60% -60%; }
+  50%  { background-position:  50%  50%; }
+  100% { background-position: 160% 160%; }
+}
+
+html, body, #root { height: 100%; background: transparent !important; }
+
+/* ===== طبقات الخلفية (تُستخدم في AppBackground.jsx) ===== */
+.bg-animated{
+  background: linear-gradient(-45deg,
+    #0A1931 0%,
+    #1E3A8A 18%,
+    #6B4A2B 38%,
+    #B08946 58%,
+    #D4AF37 78%,
+    #F4C95D 100%);
+  background-size: 300% 300%;
+  animation: brandGradient 16s ease-in-out infinite;
+  filter: saturate(1.05);
+}
+
+/* شعاع ضوء ذهبي يتحرك قطريًا ببطء */
+.bg-light-sweep{
+  background:
+    radial-gradient(60% 40% at 0% 0%,
+      rgba(244,201,93,0.35) 0%,
+      rgba(244,201,93,0.12) 35%,
+      rgba(212,175,55,0.06) 55%,
+      rgba(0,0,0,0.0) 70%);
+  background-repeat: no-repeat;
+  background-size: 120% 120%;
+  animation: sweepLight 24s linear infinite;
+  mix-blend-mode: screen;
+  opacity: .6;
+}
+
+/* Noise خفيف جدًّا لعمق بصري أنيق */
+.bg-noise{
+  background-image:
+    radial-gradient(rgba(255,255,255,0.03) 0.5px, transparent 0.5px);
+  background-size: 2px 2px;
+  opacity: .25;
+  mix-blend-mode: overlay;
+}
+
+/* ===== الزجاج العام ===== */
+:root{
+  --glass-alpha: 0.20;
+  --glass-bg: rgba(0,0,0,var(--glass-alpha));
+  --glass-brd: rgba(255,255,255,0.10);
+  --glass-blur: 6px;
+}
+
+aside, .sidebar, .sidebar-container, .app-sidebar, [data-role="sidebar"],
+header, .topbar, .app-header, [data-role="topbar"] {
+  background: var(--glass-bg) !important;
+  border-color: var(--glass-brd);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+/* الغلاف العام للصفحات */
+.page-surface {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-brd);
+  border-radius: 16px;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow:
+    0 6px 24px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  padding: 20px;
+  margin: 16px;
+}
+
+/* نصوص بيضاء افتراضيًا */
+body, main, header, aside, .page-surface,
+.card, .content-card, .panel, .box,
+.table-wrapper, .table-container {
+  color: #ffffff !important;
+}
+
+/* Recharts */
+.recharts-wrapper, .recharts-surface { background: transparent !important; }
+
+/* إزالة أي خلفيات صلبة قد تغطي الخلفية المتحركة */
+.bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100 {
+  background: transparent !important;
+}
+
+body > div, #root > div,
+main, .main, .content, .content-root, .layout, .layout-root,
+.app-layout, .layout-content, .app-content, .page, .page-root,
+.container, .container-fluid, .wrapper, .page-wrapper,
+table, thead, tbody, .table, .table-root, .table-container {
+  background: transparent !important;
+}
+
+/* ===== زر ذهبي موحّد ===== */
+.btn-gold, .button-gold, .btn-primary-gold {
+  background: linear-gradient(180deg, #F4C95D, #D4AF37);
+  color: #111;
+  border: 1px solid #B08946;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(212,175,55,.4);
+  transition: all 0.3s ease-in-out;
+}
+.btn-gold:hover,
+.btn-gold:focus,
+.button-gold:hover,
+.button-gold:focus {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  animation: goldGlow 2.5s infinite ease-in-out;
+  outline: none;
+}
+
+/* ===== الأزرار العامة ===== */
+button:focus,
+.btn:focus {
+  outline: none;
+  animation: goldGlow 2.5s infinite ease-in-out;
+}
+button:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  transition: all 0.25s ease-in-out;
+}
+
+/* ===== WhatsApp Page: طبقتان واضحتان + أزرار ذهبية ===== */
+.whatsapp-page.page-surface { background: rgba(0,0,0,0.26); }
+.whatsapp-page .card,
+.whatsapp-page .panel,
+.whatsapp-page .box,
+.whatsapp-page .content-card { background: rgba(0,0,0,0.36) !important; }
+.whatsapp-page .btn, .whatsapp-page button {
+  background: linear-gradient(180deg, #F4C95D, #D4AF37) !important;
+  color: #111 !important;
+  border: 1px solid #B08946 !important;
+  animation: goldGlow 2.5s infinite ease-in-out;
+}
+
+/* ===== جداول الصفحات: نص أسود ===== */
+.products-page table th, .products-page table td,
+.expenses-page table th, .expenses-page table td,
+.clients-page  table th, .clients-page  table td,
+.sales-page    table th, .sales-page    table td {
+  color: #111 !important;
+  background: transparent !important;
+}
+
+/* ===== أزرار الصفحات ===== */
+.products-page .btn, .products-page button,
+.expenses-page .btn, .expenses-page button,
+.clients-page  .btn, .clients-page  button,
+.sales-page    .btn, .sales-page    button {
+  background: linear-gradient(180deg, #F4C95D, #D4AF37) !important;
+  color: #111 !important;
+  border: 1px solid #B08946 !important;
+  animation: goldGlow 2.5s infinite ease-in-out;
+}
+
+/* ===== إزالة الفوتر ===== */
+footer, .pm-footer, footer.pm-footer, [data-role="footer"] {
+  display: none !important;
+}
+
+/* ===== الحقول البيضاء ===== */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="email"],
+input[type="tel"],
+input[type="search"],
+textarea,
+select {
+  color: #111 !important;
+  caret-color: #111 !important;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #B08946;
+  border-radius: 8px;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+/* Placeholder text */
+input::placeholder,
+textarea::placeholder {
+  color: rgba(0,0,0,0.55) !important;
+}
+
+/* داخل الزجاج */
+.page-surface input,
+.page-surface textarea,
+.page-surface select {
+  color: #111 !important;
+}
+
+/* ===== تأثير التركيز (Focus) الذهبي للحقول ===== */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: #F4C95D !important;
+  background: rgba(255,255,255,0.98);
+  animation: goldGlow 2.5s infinite ease-in-out;
+}
+
+/* ===== الحقول المعطّلة ===== */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  color: rgba(0,0,0,0.5) !important;
+  opacity: 0.8;
+}

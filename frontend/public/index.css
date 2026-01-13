@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== حركة التدرّج ===== */
+@keyframes brandGradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+html, body, #root { height: 100%; background: transparent !important; }
+
+/* ===== الزجاج العام ===== */
+:root{
+  --glass-alpha: 0.20;
+  --glass-bg: rgba(0,0,0,var(--glass-alpha));
+  --glass-brd: rgba(255,255,255,0.10);
+  --glass-blur: 6px;
+}
+
+aside, .sidebar, .sidebar-container, .app-sidebar, [data-role="sidebar"],
+header, .topbar, .app-header, [data-role="topbar"] {
+  background: var(--glass-bg) !important;
+  border-color: var(--glass-brd);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+/* الغلاف العام للصفحات */
+.page-surface {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-brd);
+  border-radius: 16px;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow:
+    0 6px 24px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  padding: 20px;
+  margin: 16px;
+}
+
+/* نصوص بيضاء افتراضيًا */
+body, main, header, aside, .page-surface,
+.card, .content-card, .panel, .box,
+.table-wrapper, .table-container,
+.text-ink, .text-black, .text-slate-900, .text-gray-900 {
+  color: #ffffff !important;
+}
+
+/* Recharts */
+.recharts-wrapper, .recharts-surface { background: transparent !important; }
+
+/* إزالة أي خلفيات صلبة قد تغطي التدرّج */
+.bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100 { background: transparent !important; }
+body > div, #root > div,
+main, .main, .content, .content-root, .layout, .layout-root,
+.app-layout, .layout-content, .app-content, .page, .page-root,
+.container, .container-fluid, .wrapper, .page-wrapper,
+table, thead, tbody, .table, .table-root, .table-container { background: transparent !important; }
+
+/* ===== زر ذهبي موحّد ===== */
+.btn-gold, .button-gold, .btn-primary-gold {
+  background: linear-gradient(180deg, #F4C95D, #D4AF37);
+  color: #111;
+  border: 1px solid #B08946;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(212,175,55,.35);
+}
+.btn-gold:hover { filter: brightness(0.97); }
+
+/* ===== WhatsApp: طبقتان واضحتان + أزرار ذهبية ===== */
+.whatsapp-page.page-surface { background: rgba(0,0,0,0.26); }
+.whatsapp-page .card,
+.whatsapp-page .panel,
+.whatsapp-page .box,
+.whatsapp-page .content-card { background: rgba(0,0,0,0.36) !important; }
+.whatsapp-page .btn, .whatsapp-page button {
+  background: linear-gradient(180deg, #F4C95D, #D4AF37) !important;
+  color: #111 !important;
+  border: 1px solid #B08946 !important;
+}
+
+/* ===== جداول الصفحات: نص أسود ===== */
+.products-page table th, .products-page table td,
+.expenses-page table th, .expenses-page table td,
+.clients-page  table th, .clients-page  table td,
+.sales-page    table th, .sales-page    table td {
+  color: #111 !important;
+  background: transparent !important;
+}
+
+/* ===== أزرار الصفحات المذكورة: ذهبية ===== */
+.products-page .btn, .products-page button,
+.expenses-page .btn, .expenses-page button,
+.clients-page  .btn, .clients-page  button,
+.sales-page    .btn, .sales-page    button {
+  background: linear-gradient(180deg, #F4C95D, #D4AF37) !important;
+  color: #111 !important;
+  border: 1px solid #B08946 !important;
+}
+
+/* الأزرار (إن وُجدت أنماط قديمة) */
+button, .btn, .btn-primary, .btn-secondary, .badge { color: inherit; }
+
+/* لا فوتر */
+footer, .pm-footer, footer.pm-footer, [data-role="footer"] { display: none !important; }
