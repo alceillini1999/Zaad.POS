@@ -69,6 +69,9 @@ html, body, #root { height: 100%; background: transparent !important; }
   --glass-bg: rgba(0,0,0,var(--glass-alpha));
   --glass-brd: rgba(255,255,255,0.10);
   --glass-blur: 6px;
+
+  /* ✅ إزاحة المودال لليسار لتوسيطه على كامل الشاشة مع وجود Sidebar */
+  --modal-shift-x: -120px; /* غيّرها عند الحاجة: -80 / -100 / -140 */
 }
 
 aside, .sidebar, .sidebar-container, .app-sidebar, [data-role="sidebar"],
@@ -299,4 +302,12 @@ select:disabled {
 .sales-page    .fixed.inset-0.z-50 .bg-white{
   max-height: 90vh !important;
   overflow: auto !important;
+}
+
+/* 4) ✅ إزاحة المودال قليلًا لليسار حتى يتوسّط الشاشة بالكامل */
+.products-page .fixed.inset-0.z-50 .bg-white,
+.clients-page  .fixed.inset-0.z-50 .bg-white,
+.expenses-page .fixed.inset-0.z-50 .bg-white,
+.sales-page    .fixed.inset-0.z-50 .bg-white{
+  margin-left: var(--modal-shift-x) !important;
 }
