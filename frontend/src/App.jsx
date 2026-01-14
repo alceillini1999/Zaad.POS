@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import {
   BrowserRouter,
   Routes,
@@ -55,8 +55,8 @@ function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
 
-  const tokenAlready = useMemo(() => !!getToken(), [])
-  if (tokenAlready) return <Navigate to="/overview" replace />
+  // ✅ أفضل من useMemo([]): فحص مباشر كل render
+  if (getToken()) return <Navigate to="/overview" replace />
 
   const submit = async (e) => {
     e.preventDefault()
@@ -64,11 +64,16 @@ function LoginPage() {
     setLoading(true)
 
     try {
+      const u = username.trim()
+      const p = pin.trim()
+
+      if (!u || !p) throw new Error('أدخل اسم المستخدم و PIN')
+
       const r = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
-        body: JSON.stringify({ username, pin }),
+        body: JSON.stringify({ username: u, pin: p }),
       })
 
       const data = await r.json().catch(() => ({}))
@@ -81,7 +86,7 @@ function LoginPage() {
 
       // يرجع للمسار المطلوب قبل التحويل للّوجين، أو يفتح overview
       const from = location.state?.from
-      nav(from || '/overview')
+      nav(from || '/overview', { replace: true })
     } catch (e2) {
       setErr(e2.message || 'Login failed')
     } finally {
@@ -104,6 +109,8 @@ function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="مثال: ahmed"
+                autoComplete="username"
+                required
               />
             </div>
 
@@ -114,6 +121,10 @@ function LoginPage() {
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 placeholder="مثال: 1234"
+                type="password"
+                inputMode="numeric"
+                autoComplete="current-password"
+                required
               />
             </div>
 
