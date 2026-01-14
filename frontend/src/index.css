@@ -262,37 +262,41 @@ select:disabled {
 }
 
 /* =========================================================
-   ✅ توسيط المودال في منتصف الشاشة (نهائي)
-   حل translate لتجاوز أي transform في الصفحة
+   ✅ FIX نهائي لتوسيط المودال:
+   - نلغي التأثير الذي يكسر position:fixed (will-change:transform)
+   - نثبت Overlay الحقيقي (fixed inset-0 z-50) أنه يغطي الشاشة ويتوسّط
    ========================================================= */
 
-/* استهدف صندوق المودال نفسه (dialog/modal) */
-.products-page [role="dialog"],
-.expenses-page [role="dialog"],
-.clients-page  [role="dialog"],
-.modal,
-.modal-content {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  margin: 0 !important;
-  z-index: 10000;
+/* 1) تعطيل will-change: transform في Wrapper (الموجود في DevTools) */
+.products-page [style*="will-change: transform"],
+.clients-page  [style*="will-change: transform"],
+.expenses-page [style*="will-change: transform"],
+.sales-page    [style*="will-change: transform"]{
+  will-change: auto !important;
 }
 
-/* عرض مناسب للمودال */
-.modal-content,
-.products-page [role="dialog"] > div,
-.expenses-page [role="dialog"] > div,
-.clients-page  [role="dialog"] > div {
-  width: 520px;
-  max-width: 92vw;
-  border-radius: 16px;
-}
-
-/* (اختياري) إذا كان هناك Overlay، اجعله يغطي الشاشة بدون تحريك المودال */
-.modal-overlay {
+/* 2) تثبيت الـ Overlay الحقيقي: fixed inset-0 z-50 */
+.products-page .fixed.inset-0.z-50,
+.clients-page  .fixed.inset-0.z-50,
+.expenses-page .fixed.inset-0.z-50,
+.sales-page    .fixed.inset-0.z-50{
   position: fixed !important;
   inset: 0 !important;
-  z-index: 9999;
+  width: 100vw !important;
+  height: 100vh !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  z-index: 10000 !important;
+}
+
+/* 3) تحسين بسيط: إذا كان الصندوق طويل، لا يخرج خارج الشاشة */
+.products-page .fixed.inset-0.z-50 .bg-white,
+.clients-page  .fixed.inset-0.z-50 .bg-white,
+.expenses-page .fixed.inset-0.z-50 .bg-white,
+.sales-page    .fixed.inset-0.z-50 .bg-white{
+  max-height: 90vh !important;
+  overflow: auto !important;
 }
