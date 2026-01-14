@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   BrowserRouter,
   Routes,
@@ -233,7 +233,6 @@ function CashPage() {
   }, [counts])
 
   const onCountChange = (denom, value) => {
-    // allow empty, else digits only
     if (value !== '' && !/^\d+$/.test(value)) return
     setCounts((prev) => ({ ...prev, [denom]: value }))
   }
@@ -281,7 +280,6 @@ function CashPage() {
 
       const data = await r.json().catch(() => ({}))
       if (!r.ok) {
-        // show clearer error for missing backend route
         const msg = data?.error || 'Failed to save Start Day.'
         throw new Error(msg)
       }
@@ -341,7 +339,10 @@ function CashPage() {
                         placeholder="Count"
                       />
                       <div className="text-sm opacity-90">
-                        Amount: <span className="font-semibold">{amount === '—' ? '—' : `KSh ${amount}`}</span>
+                        Amount:{' '}
+                        <span className="font-semibold">
+                          {amount === '—' ? '—' : `KSh ${amount}`}
+                        </span>
                       </div>
                     </div>
                   )
@@ -389,14 +390,24 @@ function CashPage() {
 /* =========================
    ✅ End Day Modal — English
    - Count closing cash by denomination
+   - Till No + Mpesa Withdrawal (End Day)
    - Save => logout
    ========================= */
 function EndDayModal({ open, onClose }) {
   const nav = useNavigate()
 
   const [counts, setCounts] = useState(buildInitialCounts())
+  const [tillNo, setTillNo] = useState('')
+  const [mpesaWithdrawal, setMpesaWithdrawal] = useState('0')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+
+  // Prefill Till No from Start Day when modal opens
+  useEffect(() => {
+    if (!open) return
+    const day = getDayOpen()
+    if (day?.tillNo && !tillNo) setTillNo(String(day.tillNo))
+  }, [open]) // intentionally not depending on tillNo to avoid re-running
 
   const closingTotal = useMemo(() => {
     let sum = 0
@@ -422,6 +433,12 @@ function EndDayModal({ open, onClose }) {
 
     try {
       if (closingTotal === null) throw new Error('Invalid cash counts (must be whole numbers).')
+      if (!tillNo.trim()) throw new Error('Till No is required.')
+
+      const withdrawNum = Number(mpesaWithdrawal || 0)
+      if (!Number.isFinite(withdrawNum) || withdrawNum < 0) {
+        throw new Error('Invalid Mpesa Withdrawal amount.')
+      }
 
       const day = getDayOpen()
       const today = getLocalDateISO()
@@ -437,6 +454,8 @@ function EndDayModal({ open, onClose }) {
         openId: day?.openId || null,
         closingCashTotal: closingTotal,
         cashBreakdown: breakdown,
+        tillNo: tillNo.trim(),
+        mpesaWithdrawal: withdrawNum,
         employee: getEmployee(),
         closedAt: new Date().toISOString(),
       }
@@ -476,7 +495,7 @@ function EndDayModal({ open, onClose }) {
       >
         <h3 className="text-lg font-bold mb-2">End Day</h3>
         <p className="text-sm text-[#555] mb-4">
-          Count closing cash by denomination. After saving, you will be logged out automatically.
+          Count closing cash by denomination. Enter Till No and Mpesa Withdrawal. After saving, you will be logged out automatically.
         </p>
 
         <form onSubmit={submit} className="space-y-4">
@@ -505,11 +524,38 @@ function EndDayModal({ open, onClose }) {
                     placeholder="Count"
                   />
                   <div className="text-sm text-[#111] opacity-80">
-                    Amount: <span className="font-semibold">{amount === '—' ? '—' : `KSh ${amount}`}</span>
+                    Amount:{' '}
+                    <span className="font-semibold">
+                      {amount === '—' ? '—' : `KSh ${amount}`}
+                    </span>
                   </div>
                 </div>
               )
             })}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <div>
+              <label className="block text-sm font-semibold mb-1">Mpesa Till No</label>
+              <input
+                className="w-full"
+                value={tillNo}
+                onChange={(e) => setTillNo(e.target.value)}
+                placeholder="e.g. 123456"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Mpesa Withdrawal (End Day)</label>
+              <input
+                className="w-full"
+                value={mpesaWithdrawal}
+                onChange={(e) => setMpesaWithdrawal(e.target.value)}
+                inputMode="decimal"
+                placeholder="e.g. 0"
+              />
+            </div>
           </div>
 
           {err && <div className="text-sm text-red-600">{err}</div>}

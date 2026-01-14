@@ -146,6 +146,14 @@ router.post('/close', async (req, res) => {
       return res.status(400).json({ error: 'closingCashTotal must be a non-negative number' });
     }
 
+    const tillNo = String(body.tillNo || '').trim();
+    if (!tillNo) return res.status(400).json({ error: 'tillNo is required' });
+
+    const mpesaWithdrawal = mustNumber(body.mpesaWithdrawal, 0);
+    if (mpesaWithdrawal === null || mpesaWithdrawal < 0) {
+      return res.status(400).json({ error: 'mpesaWithdrawal must be a non-negative number' });
+    }
+
     const employee = safeObj(body.employee);
     const employeeId = String(employee.id || employee.employeeId || employee.employeeid || employee.username || '').trim();
     const employeeName = String(employee.name || employee.employeeName || employee.username || '').trim();
@@ -156,13 +164,15 @@ router.post('/close', async (req, res) => {
 
     // CashClose columns:
     // A: Date | B: OpenId | C: ClosedAt | D: EmployeeId | E: EmployeeName
-    // F: ClosingCashTotal | G: CashBreakdownJSON
+    // F: TillNo | G: MpesaWithdrawal | H: ClosingCashTotal | I: CashBreakdownJSON
     await appendRow(SHEET_ID, CLOSE_TAB, [
       date,
       openId,
       closedAt,
       employeeId,
       employeeName,
+      tillNo,
+      Number(mpesaWithdrawal),
       Number(closingCashTotal),
       JSON.stringify(cashBreakdown),
     ]);
