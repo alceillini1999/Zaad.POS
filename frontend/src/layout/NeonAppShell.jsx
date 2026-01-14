@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, Outlet } from "react-router-dom";
-import OverviewNeonAnimated from "../ui/theme/OverviewNeonAnimated"; // مسار نسبي
+import OverviewNeonAnimated from "../ui/theme/OverviewNeonAnimated";
 
 const C = {
   bg: "#0B0F14",
@@ -20,31 +20,26 @@ const LINKS = [
   { to: "/sales", label: "Sales", icon: "📈" },
 ];
 
-function Brand({ size = 34, showText = true }) {
+function Brand({ size = 56, showText = true }) {
   return (
-    <div className="flex items-center gap-3">
-      <div
-        className="grid place-items-center rounded-xl border"
-        style={{
-          width: size,
-          height: size,
-          borderColor: "rgba(255,255,255,.10)",
-          background: "rgba(0,0,0,.18)",
-          boxShadow: "0 6px 18px rgba(0,0,0,.18)",
-        }}
-      >
-        <img
-          src="/logo.png"
-          alt="Zaad Bakery"
-          className="w-[85%] h-[85%] object-contain"
-          draggable="false"
-        />
-      </div>
+    <div className="flex items-center gap-4">
+      {/* اللوجو بدون صندوق */}
+      <img
+        src="/logo.png"
+        alt="Zaad Bakery"
+        style={{ height: size }}
+        className="w-auto object-contain drop-shadow-lg"
+        draggable="false"
+      />
 
       {showText && (
         <div className="leading-tight">
-          <div className="text-white/90 font-semibold tracking-wide">Zaad Bakery</div>
-          <div className="text-white/55 text-xs">Egyptian Bakery</div>
+          <div className="text-white font-bold tracking-wide text-lg">
+            Zaad Bakery
+          </div>
+          <div className="text-white/70 text-sm">
+            Egyptian Bakery
+          </div>
         </div>
       )}
     </div>
@@ -63,12 +58,12 @@ function TopBar() {
       className="sticky top-0 z-40 backdrop-blur-sm"
       style={{
         background:
-          "linear-gradient(180deg, rgba(242,192,65,0.20), rgba(242,192,65,0.06) 32%, transparent)",
+          "linear-gradient(180deg, rgba(242,192,65,0.28), rgba(242,192,65,0.10) 40%, transparent)",
         borderBottom: `1px solid ${C.border}`,
       }}
     >
       <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-        <Brand size={36} showText />
+        <Brand size={64} showText />
         <div className="text-white/70 text-sm">{now}</div>
       </div>
     </div>
@@ -82,15 +77,15 @@ function SideBar() {
     <aside
       className="hidden md:block h-screen sticky top-0 pt-6"
       style={{
-        width: 240,
-        background: "linear-gradient(180deg, rgba(26,18,11,0.85), rgba(18,22,28,0.85))",
+        width: 260,
+        background:
+          "linear-gradient(180deg, rgba(26,18,11,0.88), rgba(18,22,28,0.88))",
         borderRight: `1px solid ${C.border}`,
-        boxShadow: "inset 0 0 24px rgba(242,192,65,.10)",
       }}
     >
       <div className="px-5">
-        <div className="mb-6">
-          <Brand size={40} showText />
+        <div className="mb-8">
+          <Brand size={72} showText />
         </div>
 
         <nav className="space-y-2">
@@ -103,7 +98,9 @@ function SideBar() {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors border"
                 style={{
                   borderColor: C.border,
-                  background: active ? `linear-gradient(135deg, ${C.gold}, ${C.brown})` : C.card,
+                  background: active
+                    ? `linear-gradient(135deg, ${C.gold}, ${C.brown})`
+                    : C.card,
                   color: active ? "#0B0F14" : "#ffffffcc",
                 }}
               >
