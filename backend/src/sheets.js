@@ -1,17 +1,34 @@
 import { google } from "googleapis";
 
-export const spreadsheetId = process.env.SHEETS_SPREADSHEET_ID;
+/**
+ * Optional default spreadsheet ID for backward compatibility.
+ * You can set it, but the app can also work without it because each route can use its own SHEET_*_ID.
+ */
+export const spreadsheetId =
+  process.env.SHEETS_SPREADSHEET_ID ||
+  process.env.SHEET_EMPLOYEES_ID ||
+  process.env.SHEET_CLIENTS_ID ||
+  process.env.SHEET_PRODUCTS_ID ||
+  process.env.SHEET_SALES_ID ||
+  process.env.SHEET_EXPENSES_ID ||
+  process.env.SHEET_SESSIONS_ID ||
+  "";
 
+// Create Google auth using service account
 function getAuth() {
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  const privateKeyRaw = process.env.GOOGLE_PRIVATE_KEY || "";
+  // Support both names just in case
+  const clientEmail =
+    process.env.GOOGLE_CLIENT_EMAIL || process.env.GOOGLE_CLIENT_EMAIL;
+  const privateKeyRaw =
+    process.env.GOOGLE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY || "";
 
-  // مهم جدًا في Render: المفتاح يكون فيه \n كنص، نحوله لأسطر جديدة فعلية
-  const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
+  // Render stores it with \n as text, convert to real newlines
+  const privateKey = String(privateKeyRaw).replace(/\\n/g, "\n").trim();
 
-  if (!spreadsheetId || !clientEmail || !privateKey) {
+  // ✅ Do NOT require spreadsheetId here
+  if (!clientEmail || !privateKey) {
     throw new Error(
-      "Missing Sheets env vars: SHEETS_SPREADSHEET_ID / GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY"
+      "Missing Google Sheets env vars: GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY"
     );
   }
 
