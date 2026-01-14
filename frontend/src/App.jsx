@@ -10,6 +10,7 @@ import {
 import Layout from './components/Layout'
 
 import OverviewPage from './pages/OverviewPage'
+import SummeryPage from './pages/SummeryPage'
 import WhatsAppPage from './pages/WhatsAppPage'
 import ProductsPage from './pages/ProductsPage'
 import ExpensesPage from './pages/ExpensesPage'
@@ -200,7 +201,7 @@ function parseNonNegInt(value) {
    ✅ Cash Page (Start Day) — English
    - Count notes by denomination
    - Till No (single field)
-   - Mpesa Withdrawal (amount)
+   - Opening Till Amount (amount)
    - Save => /overview
    ========================= */
 function CashPage() {
@@ -208,7 +209,7 @@ function CashPage() {
 
   const [counts, setCounts] = useState(buildInitialCounts())
   const [tillNo, setTillNo] = useState('')
-  const [mpesaWithdrawal, setMpesaWithdrawal] = useState('0')
+  const [openingTillTotal, setOpeningTillTotal] = useState('0')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
@@ -247,9 +248,9 @@ function CashPage() {
       if (totalCash === null) throw new Error('Invalid cash counts (must be whole numbers).')
       if (!tillNo.trim()) throw new Error('Till No is required.')
 
-      const withdrawNum = Number(mpesaWithdrawal || 0)
+      const withdrawNum = Number(openingTillTotal || 0)
       if (!Number.isFinite(withdrawNum) || withdrawNum < 0) {
-        throw new Error('Invalid Mpesa Withdrawal amount.')
+        throw new Error('Invalid Opening Till amount.')
       }
 
       const breakdown = DENOMS.map((d) => ({
@@ -263,7 +264,7 @@ function CashPage() {
         openingCashTotal: totalCash,
         cashBreakdown: breakdown,
         tillNo: tillNo.trim(),
-        mpesaWithdrawal: withdrawNum,
+        openingTillTotal: withdrawNum,
         employee: getEmployee(),
         openedAt: new Date().toISOString(),
       }
@@ -290,7 +291,7 @@ function CashPage() {
         openingCashTotal: totalCash,
         cashBreakdown: breakdown,
         tillNo: tillNo.trim(),
-        mpesaWithdrawal: withdrawNum,
+        openingTillTotal: withdrawNum,
         openedAt: payload.openedAt,
       })
 
@@ -309,7 +310,7 @@ function CashPage() {
         <div className="max-w-3xl mx-auto">
           <h2 className="text-2xl font-bold mb-2">Start Day — Cash Setup</h2>
           <p className="text-sm opacity-80 mb-6">
-            Count cash notes, then enter Till No and Mpesa Withdrawal to begin the day.
+            Count cash notes, then enter Till No and Opening Till Amount to begin the day.
           </p>
 
           <form onSubmit={submit} className="space-y-6">
@@ -352,7 +353,7 @@ function CashPage() {
 
             <div className="bg-white/10 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold mb-1">Mpesa Till No</label>
+                <label className="block text-sm font-semibold mb-1">Till No</label>
                 <input
                   className="w-full"
                   value={tillNo}
@@ -363,11 +364,11 @@ function CashPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1">Mpesa Withdrawal (Start Day)</label>
+                <label className="block text-sm font-semibold mb-1">Opening Till Amount (Start Day)</label>
                 <input
                   className="w-full"
-                  value={mpesaWithdrawal}
-                  onChange={(e) => setMpesaWithdrawal(e.target.value)}
+                  value={openingTillTotal}
+                  onChange={(e) => setOpeningTillTotal(e.target.value)}
                   inputMode="decimal"
                   placeholder="e.g. 0"
                 />
@@ -390,7 +391,7 @@ function CashPage() {
 /* =========================
    ✅ End Day Modal — English
    - Count closing cash by denomination
-   - Till No + Mpesa Withdrawal (End Day)
+   - Till No + Closing Till Amount (End Day)
    - Save => logout
    ========================= */
 function EndDayModal({ open, onClose }) {
@@ -398,7 +399,7 @@ function EndDayModal({ open, onClose }) {
 
   const [counts, setCounts] = useState(buildInitialCounts())
   const [tillNo, setTillNo] = useState('')
-  const [mpesaWithdrawal, setMpesaWithdrawal] = useState('0')
+  const [closingTillTotal, setClosingTillTotal] = useState('0')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
 
@@ -435,9 +436,9 @@ function EndDayModal({ open, onClose }) {
       if (closingTotal === null) throw new Error('Invalid cash counts (must be whole numbers).')
       if (!tillNo.trim()) throw new Error('Till No is required.')
 
-      const withdrawNum = Number(mpesaWithdrawal || 0)
+      const withdrawNum = Number(closingTillTotal || 0)
       if (!Number.isFinite(withdrawNum) || withdrawNum < 0) {
-        throw new Error('Invalid Mpesa Withdrawal amount.')
+        throw new Error('Invalid Closing Till amount.')
       }
 
       const day = getDayOpen()
@@ -455,7 +456,7 @@ function EndDayModal({ open, onClose }) {
         closingCashTotal: closingTotal,
         cashBreakdown: breakdown,
         tillNo: tillNo.trim(),
-        mpesaWithdrawal: withdrawNum,
+        closingTillTotal: withdrawNum,
         employee: getEmployee(),
         closedAt: new Date().toISOString(),
       }
@@ -536,7 +537,7 @@ function EndDayModal({ open, onClose }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             <div>
-              <label className="block text-sm font-semibold mb-1">Mpesa Till No</label>
+              <label className="block text-sm font-semibold mb-1">Till No</label>
               <input
                 className="w-full"
                 value={tillNo}
@@ -547,11 +548,11 @@ function EndDayModal({ open, onClose }) {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-1">Mpesa Withdrawal (End Day)</label>
+              <label className="block text-sm font-semibold mb-1">Closing Till Amount (End Day)</label>
               <input
                 className="w-full"
-                value={mpesaWithdrawal}
-                onChange={(e) => setMpesaWithdrawal(e.target.value)}
+                value={closingTillTotal}
+                onChange={(e) => setClosingTillTotal(e.target.value)}
                 inputMode="decimal"
                 placeholder="e.g. 0"
               />
@@ -657,6 +658,21 @@ function RoutedPages() {
                 <PageWrapper>
                   <WrapSurface className="overview-page">
                     <OverviewPage />
+                  </WrapSurface>
+                </PageWrapper>
+              </DayOpenedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/summery"
+          element={
+            <ProtectedRoute>
+              <DayOpenedRoute>
+                <PageWrapper>
+                  <WrapSurface className="summery-page">
+                    <SummeryPage />
                   </WrapSurface>
                 </PageWrapper>
               </DayOpenedRoute>
