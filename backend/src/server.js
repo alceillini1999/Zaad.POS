@@ -68,6 +68,9 @@ app.get('/api/healthz', (req, res) =>
   app.use('/api/expenses', await loadRouter('./routes/expenses'));
   app.use('/api/sales',    await loadRouter('./routes/sales'));
 
+  // ✅ NEW: Cash routes (Start Day / End Day)
+  app.use('/api/cash',     await loadRouter('./routes/cash'));
+
   // ==== Upload support (ثابت + API) ====
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
