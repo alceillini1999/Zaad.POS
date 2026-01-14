@@ -41,7 +41,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppBackground>
-        <div className="min-h-screen relative">
+        {/* ✅ هذا السطح يمنع ظهور "خلفية فقط" ويضمن أن المحتوى فوق الخلفية */}
+        <div className="min-h-screen relative z-10">
           <Layout className="motion-ready">
             <RoutedPages />
           </Layout>
