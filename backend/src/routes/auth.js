@@ -1,5 +1,5 @@
 import express from "express";
-import { getSheetsClient, spreadsheetId as defaultSpreadsheetId } from "../sheets.js";
+import { getSheetsClient } from "../sheets.js";
 import { createSession } from "../auth/sessions.js";
 
 const router = express.Router();
@@ -8,11 +8,8 @@ function normalizeHeader(h) {
   return String(h ?? "").trim().toLowerCase();
 }
 
-function isActiveValue(v) {
+function isTruthy(v) {
   const s = String(v ?? "").trim().toLowerCase();
-  // اعتبر الموظف Active لو TRUE/1/yes أو الخانة فاضية (اختياري)
-  // وإذا تريد الإلزام بـ TRUE فقط احذف شرط (!s)
-  if (!s) return true;
   return s === "true" || s === "1" || s === "yes";
 }
 
@@ -23,17 +20,22 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Missing username/pin" });
     }
 
-    // ✅ خذ الـ ID واسم التاب من Environment Variables
-    const EMP_SHEET_ID = process.env.SHEET_EMPLOYEES_ID || defaultSpreadsheetId;
-    const EMP_SHEET_TAB = process.env.SHEET_EMPLOYEES_TAB || "employees";
+    // ✅ استخدم الـ ENV الخاصة بالموظفين
+    const spreadsheetId = process.env.SHEET_EMPLOYEES_ID;
+    const tab = process.env.SHEET_EMPLOYEES_TAB || "employees";
+
+    if (!spreadsheetId) {
+      return res.status(500).json({ error: "Missing SHEET_EMPLOYEES_ID" });
+    }
 
     const u = String(username).trim().toLowerCase();
     const p = String(pin).trim();
 
     const sheets = await getSheetsClient();
+
     const resp = await sheets.spreadsheets.values.get({
-      spreadsheetId: EMP_SHEET_ID,
-      range: `${EMP_SHEET_TAB}!A1:Z`,
+      spreadsheetId,
+      range: `${tab}!A1:Z`,
       valueRenderOption: "UNFORMATTED_VALUE",
     });
 
@@ -42,7 +44,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "No employees" });
     }
 
-    // ✅ طبع headers إلى lowercase لتجنب أي اختلافات في الكتابة
+    // ✅ تحويل headers إلى lowercase لتفادي اختلافات الكتابة
     const headers = rows[0].map(normalizeHeader);
 
     const list = rows.slice(1).map((r) => {
@@ -51,13 +53,14 @@ router.post("/login", async (req, res) => {
       return obj;
     });
 
-    // ✅ استخدم active (وأيضًا isactive إن وُجد)
+    // ✅ العمود الصحيح هو active (وليس isActive)
     const emp = list.find((e) => {
       const eu = String(e.username ?? "").trim().toLowerCase();
       const ep = String(e.pin ?? "").trim();
 
-      const active = e.active ?? e.isactive ?? e.isActive; // تغطية كل الاحتمالات
-      const okActive = isActiveValue(active);
+      // active لو TRUE فقط، وإلا مرفوض
+      const activeVal = e.active ?? e.isactive ?? e.isActive;
+      const okActive = activeVal === "" ? true : isTruthy(activeVal);
 
       return eu === u && ep === p && okActive;
     });
@@ -66,7 +69,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // ✅ أنشئ Session Token واحفظه في Google Sheets
+    // ✅ إنشاء Session Token وحفظه في Google Sheets
     const ip =
       req.headers["x-forwarded-for"]?.toString()?.split(",")[0]?.trim() ||
       req.socket.remoteAddress;
@@ -91,7 +94,11 @@ router.post("/login", async (req, res) => {
     });
   } catch (e) {
     console.error("auth login error:", e);
-    return res.status(500).json({ error: "Login failed", details: e.message });
+    // أثناء التشخيص خلي الرسالة واضحة بدل Login failed فقط
+    return res.status(500).json({
+      error: "Login failed",
+      details: e?.message || String(e),
+    });
   }
 });
 
