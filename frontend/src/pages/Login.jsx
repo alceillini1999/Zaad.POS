@@ -18,7 +18,10 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ username, pin }),
+        body: JSON.stringify({
+          username: String(username || "").trim(),
+          pin: String(pin || "").trim(),
+        }),
       });
 
       const data = await r.json();
@@ -34,6 +37,13 @@ export default function Login() {
     }
   };
 
+  // ستايل إجباري لضمان ظهور الكتابة بالأسود حتى لو عندك CSS عام يغيّر لون النص
+  const forceBlackInputStyle = {
+    color: "#111",
+    caretColor: "#111",
+    WebkitTextFillColor: "#111", // مهم لبعض المتصفحات/الثيمات
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-lg text-[#111]">
@@ -42,14 +52,17 @@ export default function Login() {
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold mb-1">اسم المستخدم</label>
+            <label className="block text-sm font-semibold mb-1">
+              اسم المستخدم
+            </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="مثال: ahmed"
               autoComplete="username"
-              className="w-full px-4 py-2 border rounded-lg bg-white text-[#111] caret-[#111] focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              style={forceBlackInputStyle}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-black placeholder-gray-400 caret-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
             />
           </div>
 
@@ -60,9 +73,10 @@ export default function Login() {
               inputMode="numeric"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              placeholder="مثال: 1234"
+              placeholder="مثال: 1999"
               autoComplete="current-password"
-              className="w-full px-4 py-2 border rounded-lg bg-white text-[#111] caret-[#111] focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              style={forceBlackInputStyle}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-black placeholder-gray-400 caret-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
             />
           </div>
 
