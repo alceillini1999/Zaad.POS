@@ -8,11 +8,7 @@ function Clock() {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  return (
-    <span className="text-xs md:text-sm opacity-80">
-      {now.toLocaleTimeString()}
-    </span>
-  );
+  return <span className="text-xs md:text-sm opacity-80">{now.toLocaleTimeString()}</span>;
 }
 
 /** عنصر رابط جانبي موحّد */
@@ -43,15 +39,22 @@ export default function Layout({ children, className = "" }) {
         role="banner"
       >
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-          <Link to="/overview" className="flex items-center gap-2">
+          <Link to="/overview" className="flex items-center gap-3">
+            {/* ✅ تكبير اللوجو + كسر كاش الصورة */}
             <img
-              src="/logo.png"
+              src="/logo.png?v=4"
               alt="Zaad Bakery"
-              className="h-6 w-auto select-none"
+              className="h-12 md:h-14 w-auto select-none object-contain drop-shadow-lg"
               onError={(e) => (e.currentTarget.style.display = "none")}
+              draggable="false"
             />
-            <span className="font-semibold tracking-wide">Zaad Bakery</span>
+
+            <div className="leading-tight">
+              <div className="font-bold tracking-wide text-base md:text-lg">Zaad Bakery</div>
+              <div className="text-white/70 text-xs md:text-sm">Egyptian Bakery</div>
+            </div>
           </Link>
+
           <Clock />
         </div>
       </header>
@@ -64,9 +67,23 @@ export default function Layout({ children, className = "" }) {
           aria-label="Sidebar"
         >
           <nav className="flex flex-col gap-2 w-full">
-            <div className="px-3 py-2 text-sm font-medium opacity-90">
-              Zaad Bakery
-            </div>
+            {/* ✅ إضافة لوجو داخل السايدبار بدل نص فقط */}
+            <Link to="/overview" className="flex items-center gap-3 px-3 py-2">
+              <img
+                src="/logo.png?v=4"
+                alt="Zaad Bakery"
+                className="h-12 w-auto object-contain drop-shadow-lg"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+                draggable="false"
+              />
+              <div className="leading-tight">
+                <div className="text-sm font-semibold opacity-95">Zaad Bakery</div>
+                <div className="text-xs opacity-70">Egyptian Bakery</div>
+              </div>
+            </Link>
+
+            <div className="h-px bg-white/10 my-1" />
+
             <SideItem to="/overview">Overview</SideItem>
             <SideItem to="/whatsapp">WhatsApp</SideItem>
             <SideItem to="/products">Products</SideItem>
@@ -78,10 +95,7 @@ export default function Layout({ children, className = "" }) {
         </aside>
 
         {/* المحتوى الرئيسي — بدون أي خلفية صلبة */}
-        <main
-          className="flex-1 bg-transparent"
-          role="main"
-        >
+        <main className="flex-1 bg-transparent" role="main">
           {children}
         </main>
       </div>
