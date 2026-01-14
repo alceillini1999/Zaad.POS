@@ -20,21 +20,55 @@ const LINKS = [
   { to: "/sales", label: "Sales", icon: "📈" },
 ];
 
+function Brand({ size = 34, showText = true }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className="grid place-items-center rounded-xl border"
+        style={{
+          width: size,
+          height: size,
+          borderColor: "rgba(255,255,255,.10)",
+          background: "rgba(0,0,0,.18)",
+          boxShadow: "0 6px 18px rgba(0,0,0,.18)",
+        }}
+      >
+        <img
+          src="/logo.png"
+          alt="Zaad Bakery"
+          className="w-[85%] h-[85%] object-contain"
+          draggable="false"
+        />
+      </div>
+
+      {showText && (
+        <div className="leading-tight">
+          <div className="text-white/90 font-semibold tracking-wide">Zaad Bakery</div>
+          <div className="text-white/55 text-xs">Egyptian Bakery</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TopBar() {
-  const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const now = new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
   return (
     <div
       className="sticky top-0 z-40 backdrop-blur-sm"
       style={{
-        background: "linear-gradient(180deg, rgba(242,192,65,0.20), rgba(242,192,65,0.06) 32%, transparent)",
+        background:
+          "linear-gradient(180deg, rgba(242,192,65,0.20), rgba(242,192,65,0.06) 32%, transparent)",
         borderBottom: `1px solid ${C.border}`,
       }}
     >
       <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Zaad Bakery" className="h-7 w-auto" />
-          <div className="text-white/90 font-semibold tracking-wide">Zaad Bakery</div>
-        </div>
+        <Brand size={36} showText />
         <div className="text-white/70 text-sm">{now}</div>
       </div>
     </div>
@@ -43,6 +77,7 @@ function TopBar() {
 
 function SideBar() {
   const { pathname } = useLocation();
+
   return (
     <aside
       className="hidden md:block h-screen sticky top-0 pt-6"
@@ -54,12 +89,12 @@ function SideBar() {
       }}
     >
       <div className="px-5">
-        <div className="flex items-center gap-2 mb-6">
-          <img src="/logo.png" alt="logo" className="h-8 w-auto" />
-          <div className="text-white/85 font-semibold">Zaad Bakery</div>
+        <div className="mb-6">
+          <Brand size={40} showText />
         </div>
+
         <nav className="space-y-2">
-          {LINKS.map(l => {
+          {LINKS.map((l) => {
             const active = pathname.startsWith(l.to);
             return (
               <Link
