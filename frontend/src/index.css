@@ -93,7 +93,7 @@ header, .topbar, .app-header, [data-role="topbar"] {
   margin: 16px;
 }
 
-/* نصوص بيضاء افتراضيًا */
+/* نصوص بيضاء افتراضيًا (للواجهة العامة فقط) */
 body, main, header, aside, .page-surface,
 .card, .content-card, .panel, .box,
 .table-wrapper, .table-container {
@@ -103,11 +103,11 @@ body, main, header, aside, .page-surface,
 /* Recharts */
 .recharts-wrapper, .recharts-surface { background: transparent !important; }
 
-/* إزالة أي خلفيات صلبة قد تغطي الخلفية المتحركة */
-.bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100 {
-  background: transparent !important;
-}
-
+/* =========================================================
+   ✅ إصلاح الشفافية الزائدة:
+   لا تجعل bg-white / bg-gray... شفافة، لأن المودال يعتمد عليها.
+   بدلاً من ذلك، نجعل فقط حاويات الصفحة الكبيرة شفافة.
+   ========================================================= */
 body > div, #root > div,
 main, .main, .content, .content-root, .layout, .layout-root,
 .app-layout, .layout-content, .app-content, .page, .page-root,
@@ -199,8 +199,8 @@ textarea,
 select {
   color: #111 !important;
   caret-color: #111 !important;
-  background: rgba(255,255,255,0.95);
-  border: 1px solid #B08946;
+  background: rgba(255,255,255,0.95) !important;
+  border: 1px solid #B08946 !important;
   border-radius: 8px;
   transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
@@ -224,7 +224,7 @@ textarea:focus,
 select:focus {
   outline: none !important;
   border-color: #F4C95D !important;
-  background: rgba(255,255,255,0.98);
+  background: rgba(255,255,255,0.98) !important;
   animation: goldGlow 2.5s infinite ease-in-out;
 }
 
@@ -234,4 +234,29 @@ textarea:disabled,
 select:disabled {
   color: rgba(0,0,0,0.5) !important;
   opacity: 0.8;
+}
+
+/* =========================================================
+   ✅ إصلاح وضوح المودالات (Products/Expenses/Clients):
+   أي مودال/نافذة تستخدم bg-white أو background أبيض نثبتها.
+   ========================================================= */
+.products-page .bg-white,
+.expenses-page .bg-white,
+.clients-page  .bg-white,
+.products-page [role="dialog"],
+.expenses-page [role="dialog"],
+.clients-page  [role="dialog"],
+.products-page .modal,
+.expenses-page .modal,
+.clients-page  .modal {
+  background: #ffffff !important;
+  color: #111 !important;
+}
+
+/* النصوص داخل الفورم في هذه الصفحات */
+.products-page label,
+.expenses-page label,
+.clients-page  label {
+  color: #111 !important;
+  font-weight: 600;
 }
