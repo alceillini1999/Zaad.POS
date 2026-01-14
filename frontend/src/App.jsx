@@ -40,9 +40,8 @@ function getEmployee() {
   }
 }
 
-// تاريخ اليوم بصيغة YYYY-MM-DD حسب توقيت الجهاز
+// YYYY-MM-DD (local)
 function getLocalDateISO() {
-  // en-CA يعطي YYYY-MM-DD
   return new Date().toLocaleDateString('en-CA')
 }
 
@@ -74,18 +73,17 @@ function ProtectedRoute({ children }) {
   return children
 }
 
-// يمنع الدخول لأي صفحة غير /cash إذا لم يتم فتح اليوم (Opening Cash)
+// Block dashboard pages if day is not opened
 function DayOpenedRoute({ children }) {
   const day = getDayOpen()
   const today = getLocalDateISO()
-
-  // لو لا يوجد day_open أو تاريخ قديم => لازم يروح /cash
   if (!day || day.date !== today) return <Navigate to="/cash" replace />
   return children
 }
 
 /* =========================
-   ✅ Login Page
+   ✅ Login Page (as-is)
+   - After login => /cash
    ========================= */
 function LoginPage() {
   const nav = useNavigate()
@@ -123,7 +121,6 @@ function LoginPage() {
       localStorage.setItem('token', data.token)
       localStorage.setItem('employee', JSON.stringify(data.employee || {}))
 
-      // ✅ بعد تسجيل الدخول: نبدأ دائمًا من صفحة الكاش (فتح اليوم)
       const from = location.state?.from
       nav(from || '/cash', { replace: true })
     } catch (e2) {
@@ -180,17 +177,37 @@ function LoginPage() {
 }
 
 /* =========================
-   ✅ Cash Page (Start Day)
-   - Opening cash
-   - Mpesa till no
-   - Mpesa withdrawal
-   - After save => /overview
+   ✅ Cash Counting (Denominations)
+   ========================= */
+const DENOMS = [1000, 500, 200, 100, 50, 40, 20, 10, 5, 1]
+
+function buildInitialCounts() {
+  const obj = {}
+  for (const d of DENOMS) obj[d] = ''
+  return obj
+}
+
+function parseNonNegInt(value) {
+  if (value === '' || value === null || value === undefined) return 0
+  const n = Number(value)
+  if (!Number.isFinite(n)) return null
+  if (!Number.isInteger(n)) return null
+  if (n < 0) return null
+  return n
+}
+
+/* =========================
+   ✅ Cash Page (Start Day) — English
+   - Count notes by denomination
+   - Till No (single field)
+   - Mpesa Withdrawal (amount)
+   - Save => /overview
    ========================= */
 function CashPage() {
   const nav = useNavigate()
 
-  const [openingCash, setOpeningCash] = useState('')
-  const [mpesaTillNo, setMpesaTillNo] = useState('')
+  const [counts, setCounts] = useState(buildInitialCounts())
+  const [tillNo, setTillNo] = useState('')
   const [mpesaWithdrawal, setMpesaWithdrawal] = useState('0')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
@@ -199,10 +216,27 @@ function CashPage() {
   const token = getToken()
   if (!token) return <Navigate to="/login" replace />
 
-  // لو اليوم مفتوح بالفعل، ادخل للصفحة الرئيسية
-  const existing = getDayOpen()
   const today = getLocalDateISO()
+
+  // If already opened today => go to Overview
+  const existing = getDayOpen()
   if (existing && existing.date === today) return <Navigate to="/overview" replace />
+
+  const totalCash = useMemo(() => {
+    let sum = 0
+    for (const d of DENOMS) {
+      const c = parseNonNegInt(counts[d])
+      if (c === null) return null
+      sum += d * c
+    }
+    return sum
+  }, [counts])
+
+  const onCountChange = (denom, value) => {
+    // allow empty, else digits only
+    if (value !== '' && !/^\d+$/.test(value)) return
+    setCounts((prev) => ({ ...prev, [denom]: value }))
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -211,17 +245,25 @@ function CashPage() {
     setLoading(true)
 
     try {
-      const openCashNum = Number(openingCash)
-      const withdrawNum = Number(mpesaWithdrawal || 0)
+      if (totalCash === null) throw new Error('Invalid cash counts (must be whole numbers).')
+      if (!tillNo.trim()) throw new Error('Till No is required.')
 
-      if (!Number.isFinite(openCashNum) || openCashNum < 0) throw new Error('قيمة افتتاحية الكاش غير صحيحة')
-      if (!mpesaTillNo.trim()) throw new Error('أدخل Mpesa Till No')
-      if (!Number.isFinite(withdrawNum) || withdrawNum < 0) throw new Error('قيمة Mpesa Withdrawal غير صحيحة')
+      const withdrawNum = Number(mpesaWithdrawal || 0)
+      if (!Number.isFinite(withdrawNum) || withdrawNum < 0) {
+        throw new Error('Invalid Mpesa Withdrawal amount.')
+      }
+
+      const breakdown = DENOMS.map((d) => ({
+        denom: d,
+        count: parseNonNegInt(counts[d]) ?? 0,
+        amount: d * (parseNonNegInt(counts[d]) ?? 0),
+      }))
 
       const payload = {
         date: today,
-        openingCash: openCashNum,
-        mpesaTillNo: mpesaTillNo.trim(),
+        openingCashTotal: totalCash,
+        cashBreakdown: breakdown,
+        tillNo: tillNo.trim(),
         mpesaWithdrawal: withdrawNum,
         employee: getEmployee(),
         openedAt: new Date().toISOString(),
@@ -238,22 +280,26 @@ function CashPage() {
       })
 
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data?.error || 'فشل حفظ افتتاحية اليوم')
+      if (!r.ok) {
+        // show clearer error for missing backend route
+        const msg = data?.error || 'Failed to save Start Day.'
+        throw new Error(msg)
+      }
 
-      // نخزن حالة فتح اليوم محليًا، ويمكن حفظ رقم السجل القادم من السيرفر إن وجد
       setDayOpen({
         date: today,
         openId: data?.openId || data?.id || null,
-        openingCash: openCashNum,
-        mpesaTillNo: mpesaTillNo.trim(),
+        openingCashTotal: totalCash,
+        cashBreakdown: breakdown,
+        tillNo: tillNo.trim(),
         mpesaWithdrawal: withdrawNum,
         openedAt: payload.openedAt,
       })
 
-      setOk('تم حفظ افتتاحية اليوم بنجاح')
+      setOk('Start Day saved successfully.')
       nav('/overview', { replace: true })
     } catch (e2) {
-      setErr(e2.message || 'فشل حفظ البيانات')
+      setErr(e2.message || 'Failed to save.')
     } finally {
       setLoading(false)
     }
@@ -262,50 +308,76 @@ function CashPage() {
   return (
     <PageWrapper>
       <WrapSurface className="cash-page">
-        <div className="max-w-xl mx-auto">
-          <h2 className="text-2xl font-bold mb-2">بداية اليوم - صفحة الكاش</h2>
-          <p className="text-sm opacity-80 mb-6">سجّل افتتاحية الكاش وبيانات Mpesa قبل بدء البيع</p>
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold mb-2">Start Day — Cash Setup</h2>
+          <p className="text-sm opacity-80 mb-6">
+            Count cash notes, then enter Till No and Mpesa Withdrawal to begin the day.
+          </p>
 
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-1">الكاش الموجود في الكاشير (Opening Cash)</label>
-              <input
-                className="w-full"
-                value={openingCash}
-                onChange={(e) => setOpeningCash(e.target.value)}
-                inputMode="decimal"
-                placeholder="مثال: 1500"
-                required
-              />
+          <form onSubmit={submit} className="space-y-6">
+            <div className="bg-white/10 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Cash Count (by denomination)</h3>
+                <div className="text-sm opacity-90">
+                  Total:{' '}
+                  <span className="font-bold">
+                    {totalCash === null ? '—' : `KSh ${totalCash}`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {DENOMS.map((d) => {
+                  const c = parseNonNegInt(counts[d])
+                  const amount = c === null ? '—' : d * c
+                  return (
+                    <div key={d} className="flex items-center gap-3">
+                      <div className="w-24 font-semibold">KSh {d}</div>
+                      <input
+                        className="w-32"
+                        value={counts[d]}
+                        onChange={(e) => onCountChange(d, e.target.value)}
+                        inputMode="numeric"
+                        placeholder="Count"
+                      />
+                      <div className="text-sm opacity-90">
+                        Amount: <span className="font-semibold">{amount === '—' ? '—' : `KSh ${amount}`}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-1">Mpesa Till No</label>
-              <input
-                className="w-full"
-                value={mpesaTillNo}
-                onChange={(e) => setMpesaTillNo(e.target.value)}
-                placeholder="مثال: 123456"
-                required
-              />
-            </div>
+            <div className="bg-white/10 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1">Mpesa Till No</label>
+                <input
+                  className="w-full"
+                  value={tillNo}
+                  onChange={(e) => setTillNo(e.target.value)}
+                  placeholder="e.g. 123456"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold mb-1">Mpesa Withdrawal (بداية اليوم)</label>
-              <input
-                className="w-full"
-                value={mpesaWithdrawal}
-                onChange={(e) => setMpesaWithdrawal(e.target.value)}
-                inputMode="decimal"
-                placeholder="مثال: 0"
-              />
+              <div>
+                <label className="block text-sm font-semibold mb-1">Mpesa Withdrawal (Start Day)</label>
+                <input
+                  className="w-full"
+                  value={mpesaWithdrawal}
+                  onChange={(e) => setMpesaWithdrawal(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="e.g. 0"
+                />
+              </div>
             </div>
 
             {err && <div className="text-sm text-red-600">{err}</div>}
             {ok && <div className="text-sm text-green-700">{ok}</div>}
 
             <button disabled={loading} className="btn-gold" type="submit">
-              {loading ? 'جاري الحفظ...' : 'بدء اليوم'}
+              {loading ? 'Saving...' : 'Start Day'}
             </button>
           </form>
         </div>
@@ -315,13 +387,31 @@ function CashPage() {
 }
 
 /* =========================
-   ✅ End Day Modal (Close Day + Logout)
+   ✅ End Day Modal — English
+   - Count closing cash by denomination
+   - Save => logout
    ========================= */
 function EndDayModal({ open, onClose }) {
   const nav = useNavigate()
-  const [closingCash, setClosingCash] = useState('')
+
+  const [counts, setCounts] = useState(buildInitialCounts())
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+
+  const closingTotal = useMemo(() => {
+    let sum = 0
+    for (const d of DENOMS) {
+      const c = parseNonNegInt(counts[d])
+      if (c === null) return null
+      sum += d * c
+    }
+    return sum
+  }, [counts])
+
+  const onCountChange = (denom, value) => {
+    if (value !== '' && !/^\d+$/.test(value)) return
+    setCounts((prev) => ({ ...prev, [denom]: value }))
+  }
 
   if (!open) return null
 
@@ -331,16 +421,22 @@ function EndDayModal({ open, onClose }) {
     setLoading(true)
 
     try {
-      const closeCashNum = Number(closingCash)
-      if (!Number.isFinite(closeCashNum) || closeCashNum < 0) throw new Error('قيمة كاش نهاية اليوم غير صحيحة')
+      if (closingTotal === null) throw new Error('Invalid cash counts (must be whole numbers).')
 
       const day = getDayOpen()
       const today = getLocalDateISO()
 
+      const breakdown = DENOMS.map((d) => ({
+        denom: d,
+        count: parseNonNegInt(counts[d]) ?? 0,
+        amount: d * (parseNonNegInt(counts[d]) ?? 0),
+      }))
+
       const payload = {
         date: today,
         openId: day?.openId || null,
-        closingCash: closeCashNum,
+        closingCashTotal: closingTotal,
+        cashBreakdown: breakdown,
         employee: getEmployee(),
         closedAt: new Date().toISOString(),
       }
@@ -356,14 +452,13 @@ function EndDayModal({ open, onClose }) {
       })
 
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data?.error || 'فشل حفظ نهاية اليوم')
+      if (!r.ok) throw new Error(data?.error || 'Failed to save End Day.')
 
-      // بعد إغلاق اليوم: Logout
       clearSession()
       onClose?.()
       nav('/login', { replace: true })
     } catch (e2) {
-      setErr(e2.message || 'فشل إنهاء اليوم')
+      setErr(e2.message || 'Failed to save End Day.')
     } finally {
       setLoading(false)
     }
@@ -376,30 +471,52 @@ function EndDayModal({ open, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white rounded-2xl p-6 shadow-lg"
+        className="w-full max-w-2xl bg-white rounded-2xl p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-bold mb-2">إنهاء اليوم</h3>
-        <p className="text-sm text-[#555] mb-4">سجّل كاش نهاية اليوم ثم سيتم تسجيل الخروج تلقائيًا</p>
+        <h3 className="text-lg font-bold mb-2">End Day</h3>
+        <p className="text-sm text-[#555] mb-4">
+          Count closing cash by denomination. After saving, you will be logged out automatically.
+        </p>
 
         <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold mb-1">الكاش في نهاية اليوم (Closing Cash)</label>
-            <input
-              className="w-full"
-              value={closingCash}
-              onChange={(e) => setClosingCash(e.target.value)}
-              inputMode="decimal"
-              placeholder="مثال: 9800"
-              required
-            />
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-semibold">Closing Cash Count</div>
+            <div className="text-sm text-[#111]">
+              Total:{' '}
+              <span className="font-bold">
+                {closingTotal === null ? '—' : `KSh ${closingTotal}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {DENOMS.map((d) => {
+              const c = parseNonNegInt(counts[d])
+              const amount = c === null ? '—' : d * c
+              return (
+                <div key={d} className="flex items-center gap-3">
+                  <div className="w-24 font-semibold text-[#111]">KSh {d}</div>
+                  <input
+                    className="w-32"
+                    value={counts[d]}
+                    onChange={(e) => onCountChange(d, e.target.value)}
+                    inputMode="numeric"
+                    placeholder="Count"
+                  />
+                  <div className="text-sm text-[#111] opacity-80">
+                    Amount: <span className="font-semibold">{amount === '—' ? '—' : `KSh ${amount}`}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {err && <div className="text-sm text-red-600">{err}</div>}
 
           <div className="flex gap-2">
             <button disabled={loading} className="btn-gold" type="submit">
-              {loading ? 'جاري الحفظ...' : 'حفظ وإنهاء اليوم'}
+              {loading ? 'Saving...' : 'Save & End Day'}
             </button>
             <button
               type="button"
@@ -407,7 +524,7 @@ function EndDayModal({ open, onClose }) {
               onClick={onClose}
               disabled={loading}
             >
-              إلغاء
+              Cancel
             </button>
           </div>
         </form>
@@ -418,10 +535,6 @@ function EndDayModal({ open, onClose }) {
 
 /* =========================
    ✅ Floating End Day Button
-   - يظهر فقط إذا:
-     - يوجد token
-     - اليوم مفتوح
-     - وليس في /login أو /cash
    ========================= */
 function EndDayFloatingControl() {
   const location = useLocation()
@@ -435,7 +548,6 @@ function EndDayFloatingControl() {
   const isCash = location.pathname === '/cash'
 
   const canShow = !!token && day && day.date === today && !isLogin && !isCash
-
   if (!canShow) return null
 
   return (
@@ -444,9 +556,9 @@ function EndDayFloatingControl() {
         type="button"
         onClick={() => setOpen(true)}
         className="fixed bottom-5 right-5 z-[9998] px-4 py-3 rounded-2xl shadow-lg border border-[#eee] bg-white"
-        title="إنهاء اليوم"
+        title="End Day"
       >
-        إنهاء اليوم
+        End Day
       </button>
 
       <EndDayModal open={open} onClose={() => setOpen(false)} />
@@ -475,23 +587,22 @@ function RoutedPages() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        {/* ✅ يبدأ المشروع من صفحة تسجيل الدخول */}
         <Route path="/" element={<Navigate to="/login" replace />} />
-
-        {/* Login (بدون Layout) */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* ✅ صفحة فتح اليوم (الكاش) - محمية فقط بـ token */}
         <Route
           path="/cash"
           element={
             <ProtectedRoute>
-              <CashPage />
+              <PageWrapper>
+                <WrapSurface className="cash-page">
+                  <CashPage />
+                </WrapSurface>
+              </PageWrapper>
             </ProtectedRoute>
           }
         />
 
-        {/* ✅ صفحات محمية + تتطلب فتح اليوم */}
         <Route
           path="/overview"
           element={
@@ -604,7 +715,6 @@ function AppShell() {
   return (
     <AppBackground>
       <div className="min-h-screen relative z-10">
-        {/* زر إنهاء اليوم (يظهر حسب الشروط) */}
         <EndDayFloatingControl />
 
         {isLogin ? (
