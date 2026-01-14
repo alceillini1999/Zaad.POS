@@ -260,3 +260,35 @@ select:disabled {
   color: #111 !important;
   font-weight: 600;
 }
+
+/* =========================================================
+   ✅ توسيط المودال في منتصف الشاشة (إضافة جديدة)
+   ضع هذا القسم في آخر الملف لضمان أولوية التطبيق
+   ========================================================= */
+[role="dialog"],
+.modal,
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;      /* توسيط عمودي */
+  justify-content: center !important;  /* توسيط أفقي */
+
+  z-index: 9999;
+}
+
+/* تأكد أن محتوى المودال لا يحمل margin قديم */
+[role="dialog"] > *,
+.modal-content {
+  position: relative !important;
+  margin: 0 !important;
+}
+
+/* اختياري: عرض مناسب للمودال على الديسكتوب والموبايل */
+.modal-content,
+[role="dialog"] > div {
+  width: 520px;
+  max-width: 92vw;
+  border-radius: 16px;
+}
