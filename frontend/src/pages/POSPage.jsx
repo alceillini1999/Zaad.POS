@@ -13,8 +13,10 @@ export default function POSPage(){
   const [cart,setCart]         = useState([])
   const [client,setClient]     = useState(null)
 
-  // === مطلوب: تقييد طرق الدفع إلى M-Pesa / Cash فقط
-  const [payment,setPayment]   = useState('mpesa')  // 'mpesa' | 'cash'
+  // === طرق الدفع المطلوبة: Cash / Till / Withdrawal
+  // ملاحظة: Withdrawal هنا تُسجَّل كعملية ضمن نفس مسار الحفظ (مثل باقي الطرق)
+  // لكي تظهر في Overview ضمن ملخص Withdrawal.
+  const [payment,setPayment]   = useState('cash')  // 'cash' | 'till' | 'withdrawal'
 
   // === جديد: خصم + نقاط + المبلغ المستلم/الباقي (اقتراح عملي)
   const [discount, setDiscount] = useState(0)       // amount
@@ -68,15 +70,16 @@ export default function POSPage(){
       invoiceNo: `${Date.now()}`,
       clientName: client?.name || '',
       clientPhone: client?.phone || '',
-      paymentMethod: payment,       // 'mpesa' | 'cash'
+      paymentMethod: payment,       // 'cash' | 'till' | 'withdrawal'
       items,
       subtotal,
       discount: Number(discount||0),
       total,
       profit: items.reduce((s,i)=> s + (Number(i.price)-Number(i.cost))*Number(i.qty), 0),
       addPoints: Number(addPoints||0),
-      received: Number(received||0),
-      change,
+      // received/change يُستخدمان فقط مع Cash
+      received: payment === 'cash' ? Number(received||0) : 0,
+      change: payment === 'cash' ? change : 0,
     }
 
     try{
@@ -154,13 +157,14 @@ export default function POSPage(){
                    value={discount} onChange={e=>setDiscount(+e.target.value || 0)} />
           </label>
 
-          {/* Payment method: M-Pesa / Cash فقط */}
+          {/* Payment method: Cash / Till / Withdrawal */}
           <label className="block">
             <span className="block text-white/70 mb-1">Payment Method</span>
             <select className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
                     value={payment} onChange={e=>setPayment(e.target.value)}>
-              <option value="mpesa">M-Pesa</option>
               <option value="cash">Cash</option>
+              <option value="till">Till</option>
+              <option value="withdrawal">Withdrawal</option>
             </select>
           </label>
 

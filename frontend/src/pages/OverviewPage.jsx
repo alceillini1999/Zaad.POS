@@ -41,9 +41,24 @@ export default function OverviewPage() {
   // totals
   const totals = useMemo(()=>{
     const inRange = (t)=>{ const d=new Date(t); return d>=dFrom && d<=dTo }
-    const ts = sales.filter(s=>inRange(s.createdAt)).reduce((s,r)=>s + Number(r.total||0),0)
+    const normPM = (r)=> String(r?.paymentMethod ?? r?.payment ?? r?.method ?? '').trim().toLowerCase()
+
+    // إجمالي المبيعات + تفصيل حسب طريقة الدفع (Cash / Till / Withdrawal)
+    const inRangeSales = sales.filter(s=>inRange(s.createdAt))
+    const ts = inRangeSales.reduce((sum,r)=>sum + Number(r.total||0),0)
+    const cash = inRangeSales.reduce((sum,r)=> normPM(r)==='cash' ? sum + Number(r.total||0) : sum, 0)
+    const till = inRangeSales.reduce((sum,r)=> normPM(r)==='till' ? sum + Number(r.total||0) : sum, 0)
+    const withdrawal = inRangeSales.reduce((sum,r)=> normPM(r)==='withdrawal' ? sum + Number(r.total||0) : sum, 0)
+
     const te = expenses.filter(e=>inRange(e.date)).reduce((s,r)=>s + Number(r.amount||0),0)
-    return { totalSales: ts, totalExpenses: te, netProfit: ts - te }
+    return {
+      totalSales: ts,
+      totalExpenses: te,
+      netProfit: ts - te,
+      cash,
+      till,
+      withdrawal,
+    }
   },[sales, expenses, dFrom, dTo])
 
   // dataset
@@ -91,6 +106,25 @@ export default function OverviewPage() {
         <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
           <div className="text-white/70 mb-1">Net Profit</div>
           <div className="text-3xl font-semibold">{K(totals.netProfit)}</div>
+        </div>
+      </div>
+
+      {/* تفصيل طرق إدخال المال (تُحسب تلقائيًا من مبيعات POS ضمن الفترة) */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mb-6">
+        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
+          <div className="text-white/70 mb-1">Cash</div>
+          <div className="text-3xl font-semibold">{K(totals.cash)}</div>
+          <div className="text-xs text-white/50 mt-1">إجمالي المبيعات المدفوعة Cash</div>
+        </div>
+        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
+          <div className="text-white/70 mb-1">Till</div>
+          <div className="text-3xl font-semibold">{K(totals.till)}</div>
+          <div className="text-xs text-white/50 mt-1">إجمالي المبيعات المدفوعة Till</div>
+        </div>
+        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
+          <div className="text-white/70 mb-1">Withdrawal</div>
+          <div className="text-3xl font-semibold">{K(totals.withdrawal)}</div>
+          <div className="text-xs text-white/50 mt-1">إجمالي العمليات المُسجَّلة Withdrawal</div>
         </div>
       </div>
 
