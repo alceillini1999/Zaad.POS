@@ -7,6 +7,13 @@ const SHEET_ID = process.env.SHEET_CASH_ID;
 const OPEN_TAB = process.env.SHEET_CASH_OPEN_TAB || 'CashOpen';
 const CLOSE_TAB = process.env.SHEET_CASH_CLOSE_TAB || 'CashClose';
 
+// Sales sheet (used to compute automatic cash)
+const SALES_SHEET_ID = process.env.SHEET_SALES_ID;
+const SALES_TAB = process.env.SHEET_SALES_TAB || 'Sales';
+
+// Optional defaults
+const DEFAULT_TILL_NO = process.env.DEFAULT_TILL_NO || 'TILL-1';
+
 // Accept YYYY-MM-DD, or any parseable date -> YYYY-MM-DD
 function normalizeDate(v) {
   if (v == null) return '';
@@ -17,10 +24,9 @@ function normalizeDate(v) {
   return d.toISOString().slice(0, 10);
 }
 
-function mustNumber(v, def = 0) {
-  const n = Number(v ?? def);
-  if (!Number.isFinite(n)) return null;
-  return n;
+function toNum(v, def = 0) {
+  const n = Number(String(v ?? def).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : def;
 }
 
 function safeObj(v) {
@@ -40,7 +46,72 @@ function safeArr(v) {
   }
 }
 
-// Optional: read today's open (by date)
+function pmKey(v) {
+  return String(v || '').trim().toLowerCase();
+}
+
+// Read last closing cash before given date (YYYY-MM-DD)
+async function getYesterdayClosing(date) {
+  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:I');
+  let bestDate = '';
+  let bestClosing = 0;
+
+  for (const r of (rows || [])) {
+    const d = normalizeDate(r[0]);
+    if (!d) continue;
+    if (d >= date) continue;
+
+    if (!bestDate || d > bestDate) {
+      bestDate = d;
+      bestClosing = toNum(r[7], 0); // H: ClosingCashTotal
+    }
+  }
+  return bestClosing;
+}
+
+// Find open row for date
+async function findOpenRow(date) {
+  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:I');
+  const found = (rows || []).find(r => String(r[0] || '') === date);
+  return { rows, found };
+}
+
+// Sum today's totals from sales sheet
+// Sales sheet structure (from your sales route):
+// A: DateTime, E: PaymentMethod, G: Total
+async function sumTodayFromSales(date) {
+  if (!SALES_SHEET_ID) {
+    return { cashSales: 0, tillSales: 0, withdrawals: 0 };
+  }
+
+  const rows = await readRows(SALES_SHEET_ID, SALES_TAB, 'A2:I');
+
+  let cashSales = 0;
+  let tillSales = 0;
+  let withdrawals = 0;
+
+  for (const r of (rows || [])) {
+    const createdAt = r[0];          // A
+    const d = normalizeDate(createdAt);
+    if (d !== date) continue;
+
+    const method = pmKey(r[4]);      // E
+    const total = toNum(r[6], 0);    // G
+
+    if (method === 'cash') {
+      cashSales += total;
+    } else if (method === 'till') {
+      tillSales += total;
+    } else if (method === 'withdrawal') {
+      // treat as cash out (withdrawal)
+      withdrawals += Math.abs(total);
+    }
+  }
+
+  return { cashSales, tillSales, withdrawals };
+}
+
+// ============ Existing endpoint: read today's open ============
 router.get('/today', async (req, res) => {
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
@@ -72,7 +143,70 @@ router.get('/today', async (req, res) => {
   }
 });
 
-// POST /api/cash/open
+// ============ NEW: Summary (Auto Open + Auto Compute) ============
+// GET /api/cash/summary?date=YYYY-MM-DD
+router.get('/summary', async (req, res) => {
+  try {
+    if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
+
+    const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
+
+    // 1) Ensure day is opened (auto-open)
+    let { found } = await findOpenRow(date);
+
+    let openingCashTotal = 0;
+    let openId = '';
+    let openedAt = '';
+
+    if (found) {
+      openId = String(found[1] || '');
+      openedAt = String(found[2] || '');
+      openingCashTotal = toNum(found[7], 0);
+    } else {
+      openingCashTotal = await getYesterdayClosing(date);
+      openId = `${date}-${Date.now()}`;
+      openedAt = new Date().toISOString();
+
+      // Create CashOpen row automatically
+      await appendRow(SHEET_ID, OPEN_TAB, [
+        date,                    // A
+        openId,                  // B
+        openedAt,                // C
+        '',                      // D employeeId
+        '',                      // E employeeName
+        DEFAULT_TILL_NO,         // F tillNo
+        0,                       // G mpesaWithdrawal (legacy)
+        Number(openingCashTotal),// H openingCashTotal
+        JSON.stringify([]),      // I cashBreakdown
+      ]);
+    }
+
+    // 2) Compute today's totals from Sales sheet
+    const totals = await sumTodayFromSales(date);
+
+    // 3) Expected cash in drawer (what you want “مساءً” بدون إدخال يدوي)
+    const expectedDrawerCash = openingCashTotal + totals.cashSales - totals.withdrawals;
+
+    // Optional reporting:
+    const totalReceivedAllMethods = totals.cashSales + totals.tillSales;
+
+    return res.json({
+      ok: true,
+      date,
+      openId,
+      openedAt,
+      openingCashTotal,
+      totals,
+      expectedDrawerCash,
+      totalReceivedAllMethods
+    });
+  } catch (e) {
+    console.error('GET /api/cash/summary:', e?.message || e);
+    res.status(500).json({ error: 'Failed to compute cash summary' });
+  }
+});
+
+// ============ POST /api/cash/open (kept, but now supports AUTO openingCashTotal) ============
 router.post('/open', async (req, res) => {
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
@@ -81,16 +215,21 @@ router.post('/open', async (req, res) => {
     const date = normalizeDate(body.date);
     if (!date) return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
 
-    const openingCashTotal = mustNumber(body.openingCashTotal, null);
-    if (openingCashTotal === null || openingCashTotal < 0) {
+    const tillNo = String(body.tillNo || DEFAULT_TILL_NO).trim();
+    if (!tillNo) return res.status(400).json({ error: 'tillNo is required' });
+
+    // If openingCashTotal not provided -> auto from yesterday close
+    let openingCashTotal = body.openingCashTotal;
+    if (openingCashTotal === undefined || openingCashTotal === null || openingCashTotal === '') {
+      openingCashTotal = await getYesterdayClosing(date);
+    }
+    openingCashTotal = toNum(openingCashTotal, 0);
+    if (openingCashTotal < 0) {
       return res.status(400).json({ error: 'openingCashTotal must be a non-negative number' });
     }
 
-    const tillNo = String(body.tillNo || '').trim();
-    if (!tillNo) return res.status(400).json({ error: 'tillNo is required' });
-
-    const mpesaWithdrawal = mustNumber(body.mpesaWithdrawal, 0);
-    if (mpesaWithdrawal === null || mpesaWithdrawal < 0) {
+    const mpesaWithdrawal = toNum(body.mpesaWithdrawal, 0);
+    if (mpesaWithdrawal < 0) {
       return res.status(400).json({ error: 'mpesaWithdrawal must be a non-negative number' });
     }
 
@@ -110,9 +249,6 @@ router.post('/open', async (req, res) => {
     const openId = String(body.openId || `${date}-${Date.now()}`);
     const openedAt = String(body.openedAt || new Date().toISOString());
 
-    // CashOpen columns:
-    // A: Date | B: OpenId | C: OpenedAt | D: EmployeeId | E: EmployeeName
-    // F: TillNo | G: MpesaWithdrawal | H: OpeningCashTotal | I: CashBreakdownJSON
     await appendRow(SHEET_ID, OPEN_TAB, [
       date,
       openId,
@@ -125,14 +261,14 @@ router.post('/open', async (req, res) => {
       JSON.stringify(cashBreakdown),
     ]);
 
-    res.json({ ok: true, openId });
+    res.json({ ok: true, openId, openingCashTotal });
   } catch (e) {
     console.error('POST /api/cash/open:', e?.message || e);
     res.status(500).json({ error: 'Failed to save Start Day' });
   }
 });
 
-// POST /api/cash/close
+// ============ POST /api/cash/close (kept, but now supports AUTO closingCashTotal) ============
 router.post('/close', async (req, res) => {
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
@@ -141,16 +277,11 @@ router.post('/close', async (req, res) => {
     const date = normalizeDate(body.date);
     if (!date) return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
 
-    const closingCashTotal = mustNumber(body.closingCashTotal, null);
-    if (closingCashTotal === null || closingCashTotal < 0) {
-      return res.status(400).json({ error: 'closingCashTotal must be a non-negative number' });
-    }
-
-    const tillNo = String(body.tillNo || '').trim();
+    const tillNo = String(body.tillNo || DEFAULT_TILL_NO).trim();
     if (!tillNo) return res.status(400).json({ error: 'tillNo is required' });
 
-    const mpesaWithdrawal = mustNumber(body.mpesaWithdrawal, 0);
-    if (mpesaWithdrawal === null || mpesaWithdrawal < 0) {
+    const mpesaWithdrawal = toNum(body.mpesaWithdrawal, 0);
+    if (mpesaWithdrawal < 0) {
       return res.status(400).json({ error: 'mpesaWithdrawal must be a non-negative number' });
     }
 
@@ -162,9 +293,34 @@ router.post('/close', async (req, res) => {
     const openId = String(body.openId || '');
     const closedAt = String(body.closedAt || new Date().toISOString());
 
-    // CashClose columns:
-    // A: Date | B: OpenId | C: ClosedAt | D: EmployeeId | E: EmployeeName
-    // F: TillNo | G: MpesaWithdrawal | H: ClosingCashTotal | I: CashBreakdownJSON
+    // If closingCashTotal not provided -> compute expected automatically
+    let closingCashTotal = body.closingCashTotal;
+    if (closingCashTotal === undefined || closingCashTotal === null || closingCashTotal === '') {
+      // get opening of day (auto-open if missing)
+      let { found } = await findOpenRow(date);
+      let openingCashTotal = 0;
+
+      if (!found) {
+        // auto open
+        openingCashTotal = await getYesterdayClosing(date);
+        const newOpenId = `${date}-${Date.now()}`;
+        const openedAt = new Date().toISOString();
+        await appendRow(SHEET_ID, OPEN_TAB, [
+          date, newOpenId, openedAt, '', '', DEFAULT_TILL_NO, 0, Number(openingCashTotal), JSON.stringify([]),
+        ]);
+      } else {
+        openingCashTotal = toNum(found[7], 0);
+      }
+
+      const totals = await sumTodayFromSales(date);
+      closingCashTotal = openingCashTotal + totals.cashSales - totals.withdrawals;
+    }
+
+    closingCashTotal = toNum(closingCashTotal, 0);
+    if (closingCashTotal < 0) {
+      return res.status(400).json({ error: 'closingCashTotal must be a non-negative number' });
+    }
+
     await appendRow(SHEET_ID, CLOSE_TAB, [
       date,
       openId,
@@ -177,7 +333,7 @@ router.post('/close', async (req, res) => {
       JSON.stringify(cashBreakdown),
     ]);
 
-    res.json({ ok: true });
+    res.json({ ok: true, closingCashTotal });
   } catch (e) {
     console.error('POST /api/cash/close:', e?.message || e);
     res.status(500).json({ error: 'Failed to save End Day' });
