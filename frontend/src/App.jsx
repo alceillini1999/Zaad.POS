@@ -193,12 +193,12 @@ function CashPage() {
     setLoading(true)
 
     try {
-      if (totalCash === null) throw new Error('Invalid cash counts (must be whole numbers).')
-      if (!tillNo.trim()) throw new Error('Till No is required.')
+      if (totalCash === null) throw new Error('أدخل أرقام صحيحة في خانة العد.')
+      if (!tillNo.trim()) throw new Error('رقم الدرج (Till) مطلوب.')
 
-      const withdrawNum = Number(openingTillTotal || 0)
-      if (!Number.isFinite(withdrawNum) || withdrawNum < 0) {
-        throw new Error('Invalid Opening Till amount.')
+      const tillAmount = Number(openingTillTotal || 0)
+      if (!Number.isFinite(tillAmount) || tillAmount < 0) {
+        throw new Error('قيمة Till الصباح غير صحيحة.')
       }
 
       const payload = {
@@ -206,7 +206,7 @@ function CashPage() {
         openingCashTotal: totalCash,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
-        openingTillTotal: withdrawNum,
+        openingTillTotal: tillAmount,
         employee: getEmployee(),
         openedAt: new Date().toISOString(),
       }
@@ -222,10 +222,7 @@ function CashPage() {
       })
 
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) {
-        const msg = data?.error || 'Failed to save Start Day.'
-        throw new Error(msg)
-      }
+      if (!r.ok) throw new Error(data?.error || 'فشل حفظ بداية اليوم.')
 
       const newDay = {
         date: today,
@@ -233,18 +230,15 @@ function CashPage() {
         openingCashTotal: totalCash,
         cashBreakdown: payload.cashBreakdown,
         tillNo: tillNo.trim(),
-        openingTillTotal: withdrawNum,
+        openingTillTotal: tillAmount,
         openedAt: payload.openedAt,
       }
 
       setDayOpen(newDay)
       setDayOpenState(newDay)
-      setOk('Start Day saved successfully.')
-
-      // إذا تحب بعد بدء اليوم يروح مباشرة للـ Overview فعل هذا:
-      // nav('/overview', { replace: true })
+      setOk('تم تسجيل بداية اليوم بنجاح.')
     } catch (e2) {
-      setErr(e2.message || 'Failed to save Start Day.')
+      setErr(e2.message || 'فشل حفظ بداية اليوم.')
     } finally {
       setLoading(false)
     }
@@ -257,12 +251,12 @@ function CashPage() {
     setLoading(true)
 
     try {
-      if (totalCash === null) throw new Error('Invalid cash counts (must be whole numbers).')
-      if (!tillNo.trim()) throw new Error('Till No is required.')
+      if (totalCash === null) throw new Error('أدخل أرقام صحيحة في خانة العد.')
+      if (!tillNo.trim()) throw new Error('رقم الدرج (Till) مطلوب.')
 
-      const withdrawNum = Number(closingTillTotal || 0)
-      if (!Number.isFinite(withdrawNum) || withdrawNum < 0) {
-        throw new Error('Invalid Closing Till amount.')
+      const tillAmount = Number(closingTillTotal || 0)
+      if (!Number.isFinite(tillAmount) || tillAmount < 0) {
+        throw new Error('قيمة Till المساء غير صحيحة.')
       }
 
       const payload = {
@@ -271,7 +265,7 @@ function CashPage() {
         closingCashTotal: totalCash,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
-        closingTillTotal: withdrawNum,
+        closingTillTotal: tillAmount,
         employee: getEmployee(),
         closedAt: new Date().toISOString(),
       }
@@ -287,121 +281,135 @@ function CashPage() {
       })
 
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data?.error || 'Failed to save End Day.')
+      if (!r.ok) throw new Error(data?.error || 'فشل حفظ نهاية اليوم.')
 
-      // End of day => clear session and return to login
       clearSession()
       setDayOpenState(null)
       nav('/login', { replace: true })
     } catch (e2) {
-      setErr(e2.message || 'Failed to save End Day.')
+      setErr(e2.message || 'فشل حفظ نهاية اليوم.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4" style={{ color: '#111' }}>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="text-xl font-extrabold">
-            {isOpenedToday ? 'End Day (Evening Cash)' : 'Start Day (Morning Cash)'}
+            {isOpenedToday ? 'نهاية اليوم (أموال المساء)' : 'بداية اليوم (أموال الصباح)'}
           </h2>
-          <div className="text-sm opacity-80">Date: {today}</div>
+          <div className="text-sm opacity-80">التاريخ: {today}</div>
         </div>
 
         {isOpenedToday && (
           <button
             type="button"
-            className="px-4 py-2 rounded-xl border border-white/20 bg-white/10 hover:bg-white/15"
+            className="px-4 py-2 rounded-xl border border-black/20 bg-white/70 hover:bg-white/90"
             onClick={() => nav('/overview')}
           >
-            Go to Overview
+            الذهاب للملخص
           </button>
         )}
       </div>
 
+      {isOpenedToday && (
+        <div className="text-sm opacity-80 mb-3">
+          أموال الصباح المسجلة: <b>KSh {Number(dayOpenState?.openingCashTotal || 0)}</b>
+        </div>
+      )}
+
       <form onSubmit={isOpenedToday ? submitEndDay : submitStartDay} className="space-y-4">
-        <div className="bg-white/10 rounded-2xl p-4">
+        <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.75)' }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold">Cash Count (by denomination)</h3>
+            <h3 className="text-lg font-semibold">عدّ النقد (حسب الفئات)</h3>
             <div className="text-sm opacity-90">
-              Total:{' '}
-              <span className="font-bold">{totalCash === null ? '—' : `KSh ${totalCash}`}</span>
+              الإجمالي: <span className="font-bold">{totalCash === null ? '—' : `KSh ${totalCash}`}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {DENOMS.map((d) => {
-              const c = parseNonNegInt(counts[d])
-              const amount = c === null ? '—' : d * c
-              return (
-                <div key={d} className="flex items-center gap-3">
-                  <div className="w-24 font-semibold">KSh {d}</div>
-                  <input
-                    className="w-32"
-                    value={counts[d]}
-                    onChange={(e) => onCountChange(d, e.target.value)}
-                    inputMode="numeric"
-                    placeholder="Count"
-                  />
-                  <div className="text-sm opacity-90">
-                    Amount:{' '}
-                    <span className="font-semibold">
-                      {amount === '—' ? '—' : `KSh ${amount}`}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
+            {DENOMS.map((d) => (
+              <div key={d} className="flex items-center gap-3">
+                <div className="w-28 font-semibold">KSh {d}</div>
+                <input
+                  value={counts[d]}
+                  onChange={(e) => onCountChange(d, e.target.value)}
+                  inputMode="numeric"
+                  placeholder="Count"
+                  style={{
+                    width: 140,
+                    padding: 10,
+                    borderRadius: 12,
+                    border: '1px solid rgba(0,0,0,0.2)',
+                    background: 'white',
+                  }}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="bg-white/10 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ background: 'rgba(255,255,255,0.75)' }}>
           <div>
-            <label className="block text-sm font-semibold mb-1">Till No</label>
+            <label className="block text-sm font-semibold mb-1">رقم الدرج (Till)</label>
             <input
-              className="w-full"
               value={tillNo}
               onChange={(e) => setTillNo(e.target.value)}
-              placeholder="e.g., TILL-1"
+              placeholder="مثال: TILL-1"
+              style={{
+                width: '100%',
+                padding: 10,
+                borderRadius: 12,
+                border: '1px solid rgba(0,0,0,0.2)',
+                background: 'white',
+              }}
             />
           </div>
 
           {!isOpenedToday ? (
             <div>
-              <label className="block text-sm font-semibold mb-1">
-                Opening Till Amount (optional)
-              </label>
+              <label className="block text-sm font-semibold mb-1">مبلغ Till الصباح (اختياري)</label>
               <input
-                className="w-full"
                 value={openingTillTotal}
                 onChange={(e) => setOpeningTillTotal(e.target.value)}
                 inputMode="numeric"
                 placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: 10,
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,0,0,0.2)',
+                  background: 'white',
+                }}
               />
             </div>
           ) : (
             <div>
-              <label className="block text-sm font-semibold mb-1">
-                Closing Till Amount (optional)
-              </label>
+              <label className="block text-sm font-semibold mb-1">مبلغ Till المساء (اختياري)</label>
               <input
-                className="w-full"
                 value={closingTillTotal}
                 onChange={(e) => setClosingTillTotal(e.target.value)}
                 inputMode="numeric"
                 placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: 10,
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,0,0,0.2)',
+                  background: 'white',
+                }}
               />
             </div>
           )}
         </div>
 
-        {err && <div className="text-sm text-red-600">{err}</div>}
-        {ok && <div className="text-sm text-green-700">{ok}</div>}
+        {err && <div className="text-sm" style={{ color: '#b00020' }}>{err}</div>}
+        {ok && <div className="text-sm" style={{ color: '#1b5e20' }}>{ok}</div>}
 
         <button disabled={loading} className="btn-gold" type="submit">
-          {loading ? 'Saving...' : isOpenedToday ? 'End Day' : 'Start Day'}
+          {loading ? 'جارٍ الحفظ...' : isOpenedToday ? 'نهاية اليوم' : 'بدء اليوم'}
         </button>
       </form>
     </div>
