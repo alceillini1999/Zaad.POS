@@ -88,6 +88,10 @@ export default function Layout({ children, className = "" }) {
             <SideItem to="/whatsapp">WhatsApp</SideItem>
             <SideItem to="/products">Products</SideItem>
             <SideItem to="/expenses">Expenses</SideItem>
+
+            {/* ✅ صفحة الكاش */}
+            <SideItem to="/cash">Cash</SideItem>
+
             <SideItem to="/pos">POS</SideItem>
             <SideItem to="/clients">Clients</SideItem>
             <SideItem to="/sales">Sales</SideItem>
