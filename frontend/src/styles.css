@@ -15,3 +15,17 @@ body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", 
 /* quick utility so hover uses color token in examples */
 .hover\:bg-pyramid-yellow\/20:hover { background-color: rgba(241,196,15,0.12); }
 .text-pyramid-dark { color: var(--pyramid-dark); }
+
+/* =========================================================
+   ✅ احتياط لظهور الكتابة بالأسود إذا كان هذا الملف هو المُحمّل
+   ========================================================= */
+.force-black-input{
+  color: #111 !important;
+  caret-color: #111 !important;
+  background: rgba(255,255,255,0.98) !important;
+  -webkit-text-fill-color: #111 !important;
+}
+.force-black-input::placeholder{
+  color: rgba(0,0,0,0.55) !important;
+  -webkit-text-fill-color: rgba(0,0,0,0.55) !important;
+}

@@ -311,3 +311,27 @@ select:disabled {
 .sales-page    .fixed.inset-0.z-50 .bg-white{
   margin-left: var(--modal-shift-x) !important;
 }
+
+/* =========================================================
+   ✅ FIX نهائي لظهور الكتابة في صفحة Login الموظفين:
+   بعض الثيمات تفرض -webkit-text-fill-color أو لون أبيض بـ !important
+   لذلك نثبت اللون الأسود على كلاس محدد وعلى كل inputs أيضًا.
+   ========================================================= */
+.force-black-input{
+  color: #111 !important;
+  caret-color: #111 !important;
+  background: rgba(255,255,255,0.98) !important;
+  -webkit-text-fill-color: #111 !important;
+}
+.force-black-input::placeholder{
+  color: rgba(0,0,0,0.55) !important;
+  -webkit-text-fill-color: rgba(0,0,0,0.55) !important;
+}
+
+/* زيادة حماية عامة لكل الحقول */
+input, textarea, select{
+  -webkit-text-fill-color: #111 !important;
+}
+input::placeholder, textarea::placeholder{
+  -webkit-text-fill-color: rgba(0,0,0,0.55) !important;
+}

@@ -8,13 +8,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+  // ✅ مرونة في عنوان الـ API:
+  // - لو عندك VITE_API_URL في Render/Env للـ Frontend استخدمه (مثلاً: https://xxx.onrender.com/api)
+  // - وإلا استخدم /api (في حالة نفس الدومين مع Proxy/Rewrite)
+  const API_BASE = import.meta?.env?.VITE_API_URL || "/api";
+
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
     setLoading(true);
 
     try {
-      const r = await fetch("/api/auth/login", {
+      const r = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
@@ -24,8 +29,8 @@ export default function Login() {
         }),
       });
 
-      const data = await r.json();
-      if (!r.ok) throw new Error(data?.error || "Login failed");
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || data?.message || "Login failed");
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("employee", JSON.stringify(data.employee || {}));
@@ -37,11 +42,12 @@ export default function Login() {
     }
   };
 
-  // ستايل إجباري لضمان ظهور الكتابة بالأسود حتى لو عندك CSS عام يغيّر لون النص
+  // ✅ ستايل إجباري على مستوى العنصر نفسه
+  // مهم لأن بعض الثيمات تستخدم -webkit-text-fill-color مع !important
   const forceBlackInputStyle = {
     color: "#111",
     caretColor: "#111",
-    WebkitTextFillColor: "#111", // مهم لبعض المتصفحات/الثيمات
+    WebkitTextFillColor: "#111",
   };
 
   return (
@@ -52,9 +58,7 @@ export default function Login() {
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold mb-1">
-              اسم المستخدم
-            </label>
+            <label className="block text-sm font-semibold mb-1">اسم المستخدم</label>
             <input
               type="text"
               value={username}
@@ -62,7 +66,7 @@ export default function Login() {
               placeholder="مثال: ahmed"
               autoComplete="username"
               style={forceBlackInputStyle}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-black placeholder-gray-400 caret-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
             />
           </div>
 
@@ -76,7 +80,7 @@ export default function Login() {
               placeholder="مثال: 1999"
               autoComplete="current-password"
               style={forceBlackInputStyle}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-black placeholder-gray-400 caret-black focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
             />
           </div>
 
