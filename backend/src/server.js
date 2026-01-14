@@ -12,6 +12,12 @@ const bcrypt = require('bcryptjs');
 const app = express();
 app.use(helmet());
 
+// ✅ حمّل Router سواء كان CommonJS أو ESModule
+function loadRouter(p) {
+  const mod = require(p);
+  return mod?.default || mod;
+}
+
 // CORS
 const defaultAllow = 'https://zaad-bakery.onrender.com,https://zaad-bakery-site.onrender.com,http://localhost:5173';
 const allowlist = (process.env.CORS_ALLOWLIST || defaultAllow).split(',').map(s => s.trim()).filter(Boolean);
@@ -41,24 +47,23 @@ app.get('/api/healthz', (req, res) =>
 );
 
 // Routers
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/whatsapp', require('./routes/whatsapp'));
-app.use('/api/uploads', require('./routes/uploads'));
-app.use('/api/stats', require('./routes/stats'));
-app.use('/api/pos', require('./routes/pos'));
+app.use('/api/auth',     loadRouter('./routes/auth'));      // ✅ كان سبب المشكلة
+app.use('/api/whatsapp', loadRouter('./routes/whatsapp'));
+app.use('/api/uploads',  loadRouter('./routes/uploads'));
+app.use('/api/stats',    loadRouter('./routes/stats'));
+app.use('/api/pos',      loadRouter('./routes/pos'));
 
 // Google Sheets–backed routes
-app.use('/api/products', require('./routes/products'));
-app.use('/api/clients',  require('./routes/clients'));
-app.use('/api/expenses', require('./routes/expenses'));
-app.use('/api/sales',    require('./routes/sales'));
+app.use('/api/products', loadRouter('./routes/products'));
+app.use('/api/clients',  loadRouter('./routes/clients'));
+app.use('/api/expenses', loadRouter('./routes/expenses'));
+app.use('/api/sales',    loadRouter('./routes/sales'));
 
 // ==== Upload support (ثابت + API) ====
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // تحمل إما CommonJS أو ESModule
-const _uploadRouter = require('./routes/upload');
-const uploadRouter = _uploadRouter?.default || _uploadRouter;
+const uploadRouter = loadRouter('./routes/upload');
 app.use('/api/upload', uploadRouter);   // المسار الجديد الذي تستخدمه الواجهة
 app.use('/api/uploads', uploadRouter);  // مسار قديم للتوافق
 
@@ -72,7 +77,10 @@ if (hasDist) {
   app.use(express.static(distDir));
   const sendIndex = (req, res) => {
     try { res.sendFile(indexFile); }
-    catch (e) { console.error('sendFile(index.html) failed:', e?.message || e); res.status(200).json({ status:'backend-live', note:'failed to serve index.html', error:true }); }
+    catch (e) {
+      console.error('sendFile(index.html) failed:', e?.message || e);
+      res.status(200).json({ status:'backend-live', note:'failed to serve index.html', error:true });
+    }
   };
   app.get('/', sendIndex);
   app.get('*', (req, res, next) => req.path.startsWith('/api') ? next() : sendIndex(req, res));
@@ -80,28 +88,44 @@ if (hasDist) {
   app.get('/', (_req, res) => res.json({ status:'backend-live', note:'frontend/dist not found' }));
 }
 
-// Mongo
-const MONGO = process.env.MONGO_URI || 'mongodb://localhost:27017/Zaad Bakery';
-mongoose.connect(MONGO).then(() => {
-  console.log('Mongo connected');
-  ensureAdmin().catch(e => console.error('ensureAdmin failed:', e?.message || e));
-}).catch(err => console.error('Mongo connection error:', err?.message || err));
+// ✅ Mongo (اختياري) — لن يتصل إلا إذا وفّرت MONGO_URI
+const MONGO_URI = process.env.MONGO_URI;
+if (MONGO_URI) {
+  mongoose.connect(MONGO_URI).then(() => {
+    console.log('Mongo connected');
+    ensureAdmin().catch(e => console.error('ensureAdmin failed:', e?.message || e));
+  }).catch(err => console.error('Mongo connection error:', err?.message || err));
+} else {
+  console.log('Mongo disabled: MONGO_URI not set (Google Sheets mode).');
+}
 
-// Bootstrap Admin
-const User = require('./models/User');
+// Bootstrap Admin (يعمل فقط إذا كان Mongo مفعّل + بيانات الأدمن موجودة)
+let User;
+try { User = require('./models/User'); } catch {}
 async function ensureAdmin() {
+  if (!MONGO_URI || !User) return;
+
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPass = process.env.ADMIN_PASSWORD;
   console.log('ENV check -> ADMIN_EMAIL:', !!adminEmail, 'ADMIN_PASSWORD:', !!adminPass);
-  if (!adminEmail || !adminPass) { console.log('ADMIN_EMAIL or ADMIN_PASSWORD not provided — skipping admin bootstrap.'); return; }
+
+  if (!adminEmail || !adminPass) {
+    console.log('ADMIN_EMAIL or ADMIN_PASSWORD not provided — skipping admin bootstrap.');
+    return;
+  }
+
   try {
     const exists = await User.findOne({ email: adminEmail.toLowerCase() });
     if (!exists) {
       const hash = await bcrypt.hash(adminPass, 10);
       await new User({ name:'Owner', email:adminEmail.toLowerCase(), passwordHash:hash, role:'owner' }).save();
       console.log('Created initial admin user:', adminEmail);
-    } else { console.log('Admin user already exists.'); }
-  } catch (err) { console.error('Admin creation error', err?.message || err); }
+    } else {
+      console.log('Admin user already exists.');
+    }
+  } catch (err) {
+    console.error('Admin creation error', err?.message || err);
+  }
 }
 
 // Start
