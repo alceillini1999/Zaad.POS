@@ -262,33 +262,37 @@ select:disabled {
 }
 
 /* =========================================================
-   ✅ توسيط المودال في منتصف الشاشة (إضافة جديدة)
-   ضع هذا القسم في آخر الملف لضمان أولوية التطبيق
+   ✅ توسيط المودال في منتصف الشاشة (نهائي)
+   حل translate لتجاوز أي transform في الصفحة
    ========================================================= */
-[role="dialog"],
+
+/* استهدف صندوق المودال نفسه (dialog/modal) */
+.products-page [role="dialog"],
+.expenses-page [role="dialog"],
+.clients-page  [role="dialog"],
 .modal,
-.modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-
-  display: flex !important;
-  align-items: center !important;      /* توسيط عمودي */
-  justify-content: center !important;  /* توسيط أفقي */
-
-  z-index: 9999;
-}
-
-/* تأكد أن محتوى المودال لا يحمل margin قديم */
-[role="dialog"] > *,
 .modal-content {
-  position: relative !important;
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
   margin: 0 !important;
+  z-index: 10000;
 }
 
-/* اختياري: عرض مناسب للمودال على الديسكتوب والموبايل */
+/* عرض مناسب للمودال */
 .modal-content,
-[role="dialog"] > div {
+.products-page [role="dialog"] > div,
+.expenses-page [role="dialog"] > div,
+.clients-page  [role="dialog"] > div {
   width: 520px;
   max-width: 92vw;
   border-radius: 16px;
+}
+
+/* (اختياري) إذا كان هناك Overlay، اجعله يغطي الشاشة بدون تحريك المودال */
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999;
 }
