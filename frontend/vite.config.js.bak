@@ -1,9 +1,0 @@
-// frontend/vite.config.js
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// جَعْل المسارات نسبية حتى تُحمّل assets بشكل صحيح عند النشر على Render/static hosts
-export default defineConfig({
-  base: './',
-  plugins: [react()],
-})

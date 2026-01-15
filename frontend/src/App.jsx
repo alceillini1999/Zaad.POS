@@ -12,7 +12,7 @@ import {
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 
-import LoginPage from './pages/LoginPage'
+import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import OverviewPage from './pages/OverviewPage'
 import ProductsPage from './pages/ProductsPage'
@@ -636,7 +636,7 @@ function RoutedPages() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<Login />} />
 
         <Route
           path="/cash"

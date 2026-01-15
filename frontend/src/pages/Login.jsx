@@ -9,9 +9,12 @@ export default function Login() {
   const [err, setErr] = useState("");
 
   // ✅ مرونة في عنوان الـ API:
-  // - لو عندك VITE_API_URL في Render/Env للـ Frontend استخدمه (مثلاً: https://xxx.onrender.com/api)
+  // - لو عندك VITE_API_URL في Render/Env للـ Frontend استخدمه
+  //   (سواء كتبت الدومين فقط أو الدومين + /api)
   // - وإلا استخدم /api (في حالة نفس الدومين مع Proxy/Rewrite)
-  const API_BASE = import.meta?.env?.VITE_API_URL || "/api";
+  const API_ORIG = (import.meta?.env?.VITE_API_URL || "").replace(/\/+$/, "");
+  const API_HOST = API_ORIG.replace(/\/api$/, "");
+  const API_URL = API_HOST ? `${API_HOST}/api` : "/api";
 
   const submit = async (e) => {
     e.preventDefault();
@@ -19,7 +22,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const r = await fetch(`${API_BASE}/auth/login`, {
+      const r = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",

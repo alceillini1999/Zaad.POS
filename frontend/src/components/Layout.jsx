@@ -85,6 +85,7 @@ export default function Layout({ children, className = "" }) {
             <div className="h-px bg-white/10 my-1" />
 
             <SideItem to="/overview">Overview</SideItem>
+            <SideItem to="/summery">Summary</SideItem>
             <SideItem to="/whatsapp">WhatsApp</SideItem>
             <SideItem to="/products">Products</SideItem>
             <SideItem to="/expenses">Expenses</SideItem>

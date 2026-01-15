@@ -35,7 +35,8 @@ function lsKey(prefix, day) {
 
 function readDayOpen() {
   try {
-    return JSON.parse(localStorage.getItem("day_open") || "null");
+    // App.jsx stores Start-Day info under "dayOpen"
+    return JSON.parse(localStorage.getItem("dayOpen") || "null");
   } catch {
     return null;
   }
@@ -89,7 +90,7 @@ export default function SummeryPage() {
   useEffect(() => {
     if (!isSingleDay) return;
 
-    // Prefer values from Start Day (day_open) if it matches the selected day
+    // Prefer values from Start Day (dayOpen) if it matches the selected day
     const dayOpen = readDayOpen();
     const dayOpenMatches = dayOpen?.date === dayKey;
 
