@@ -1,6 +1,6 @@
-import express from "express";
-import { getSheetsClient } from "../sheets.js";
-import { createSession } from "../auth/sessions.js";
+const express = require("express");
+const { getSheetsClient } = require("../sheets.js");
+const { createSession } = require("../auth/sessions.js");
 
 const router = express.Router();
 
@@ -20,7 +20,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Missing username/pin" });
     }
 
-    // ✅ استخدم الـ ENV الخاصة بالموظفين
+    // الموظفين
     const spreadsheetId = process.env.SHEET_EMPLOYEES_ID;
     const tab = process.env.SHEET_EMPLOYEES_TAB || "employees";
 
@@ -44,7 +44,6 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "No employees" });
     }
 
-    // ✅ تحويل headers إلى lowercase لتفادي اختلافات الكتابة
     const headers = rows[0].map(normalizeHeader);
 
     const list = rows.slice(1).map((r) => {
@@ -53,7 +52,6 @@ router.post("/login", async (req, res) => {
       return obj;
     });
 
-    // ✅ العمود الصحيح هو active (وليس isActive)
     const emp = list.find((e) => {
       const eu = String(e.username ?? "").trim().toLowerCase();
       const ep = String(e.pin ?? "").trim();
@@ -69,7 +67,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // ✅ إنشاء Session Token وحفظه في Google Sheets
+    // إنشاء Session Token وحفظه في Google Sheets
     const ip =
       req.headers["x-forwarded-for"]?.toString()?.split(",")[0]?.trim() ||
       req.socket.remoteAddress;
@@ -94,7 +92,6 @@ router.post("/login", async (req, res) => {
     });
   } catch (e) {
     console.error("auth login error:", e);
-    // أثناء التشخيص خلي الرسالة واضحة بدل Login failed فقط
     return res.status(500).json({
       error: "Login failed",
       details: e?.message || String(e),
@@ -102,4 +99,4 @@ router.post("/login", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

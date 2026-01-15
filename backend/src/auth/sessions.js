@@ -1,5 +1,5 @@
-import crypto from "crypto";
-import { getSheetsClient, spreadsheetId } from "../sheets.js";
+const crypto = require("crypto");
+const { getSheetsClient, spreadsheetId } = require("../sheets.js");
 
 const SESSIONS_SHEET = "sessions";
 
@@ -13,30 +13,45 @@ function addHoursISO(hours) {
   return d.toISOString();
 }
 
-export function generateToken() {
+function generateToken() {
   return crypto.randomBytes(32).toString("hex"); // 64 chars
 }
 
-export async function createSession({ employeeId, employeeName, ip, userAgent, ttlHours = 12 }) {
+async function createSession({
+  employeeId,
+  employeeName,
+  ip,
+  userAgent,
+  ttlHours = 12,
+}) {
   const sheets = await getSheetsClient();
+
+  const sid = process.env.SHEET_SESSIONS_ID || spreadsheetId;
+  if (!sid) {
+    throw new Error(
+      "Missing sessions spreadsheet id: set SHEET_SESSIONS_ID or SHEETS_SPREADSHEET_ID"
+    );
+  }
 
   const token = generateToken();
   const createdAt = nowISO();
   const expiresAt = addHoursISO(ttlHours);
 
-  const values = [[
-    token,
-    String(employeeId || ""),
-    String(employeeName || ""),
-    createdAt,
-    expiresAt,
-    "true",
-    String(ip || ""),
-    String(userAgent || ""),
-  ]];
+  const values = [
+    [
+      token,
+      String(employeeId || ""),
+      String(employeeName || ""),
+      createdAt,
+      expiresAt,
+      "true",
+      String(ip || ""),
+      String(userAgent || ""),
+    ],
+  ];
 
   await sheets.spreadsheets.values.append({
-    spreadsheetId,
+    spreadsheetId: sid,
     range: `${SESSIONS_SHEET}!A1`,
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
@@ -46,11 +61,14 @@ export async function createSession({ employeeId, employeeName, ip, userAgent, t
   return { token, createdAt, expiresAt };
 }
 
-export async function getSessionByToken(token) {
+async function getSessionByToken(token) {
   const sheets = await getSheetsClient();
 
+  const sid = process.env.SHEET_SESSIONS_ID || spreadsheetId;
+  if (!sid) return null;
+
   const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId,
+    spreadsheetId: sid,
     range: `${SESSIONS_SHEET}!A1:Z`,
   });
 
@@ -61,7 +79,7 @@ export async function getSessionByToken(token) {
   const tokenIdx = headers.indexOf("token");
   if (tokenIdx === -1) return null;
 
-  const record = rows.slice(1).find(r => (r[tokenIdx] || "") === token);
+  const record = rows.slice(1).find((r) => (r[tokenIdx] || "") === token);
   if (!record) return null;
 
   const obj = {};
@@ -69,7 +87,7 @@ export async function getSessionByToken(token) {
   return obj;
 }
 
-export function isSessionValid(session) {
+function isSessionValid(session) {
   if (!session) return false;
   if (String(session.isActive).toLowerCase() !== "true") return false;
 
@@ -78,3 +96,10 @@ export function isSessionValid(session) {
 
   return Date.now() < exp;
 }
+
+module.exports = {
+  generateToken,
+  createSession,
+  getSessionByToken,
+  isSessionValid,
+};
