@@ -5,27 +5,33 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        /* legacy names kept for compatibility */
-        gold: '#F59E0B',
-        cocoa: '#0F172A',
-        ink: '#0B1220',
-        base: '#FAFAFA',
+        // Zaad Bakery – Theme 01 (Bakery Modern)
+        // Backgrounds / surfaces
+        base: '#F7F7F5',
         card: '#FFFFFF',
-        line: '#EAE7E1',
-        mute: '#6B7280',
-        neon: {
-          bg: '#0B0F14',
-          card: 'rgba(18,22,28,0.8)',
-          border: 'rgba(255,255,255,0.06)',
-          gold: '#F2C041',
-          violet: '#a855f7',
-          cyan: '#22d3ee',
-          orange: '#f97316',
-        },
+        elev: '#FFFFFF',
+
+        // Typography
+        ink: '#0F172A',
+        mute: '#64748B',
+
+        // Borders
+        line: '#E2E8F0',
+
+        // Brand
+        gold: '#C57A2A',     // Primary
+        cocoa: '#7A4B23',    // Deep warm brown (supporting)
+        secondary: '#1F9D8A',
+
+        // Status
+        success: '#16A34A',
+        danger: '#DC2626',
+        warning: '#F59E0B',
       },
       boxShadow: {
         soft: '0 8px 24px rgba(17,17,17,0.06)',
-        neon: '0 0 24px rgba(249,115,22,0.25), inset 0 0 1px rgba(255,255,255,0.35)',
+        // keep legacy name in case something still references it
+        neon: '0 8px 24px rgba(15,23,42,0.08)',
       },
       borderRadius: { xl2: '1rem' },
       fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] },

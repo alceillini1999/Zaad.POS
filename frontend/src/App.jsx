@@ -75,7 +75,13 @@ function getLocalDateISO() {
 ====================== */
 function AppBackground({ children }) {
   return (
-    <div className="min-h-screen text-[#111] bg-gradient-to-br from-[#caa44b] via-[#a77f2e] to-[#5b3b16]">
+    <div
+      className="min-h-screen text-ink bg-base"
+      style={{
+        backgroundImage:
+          "radial-gradient(900px 320px at 12% 0%, rgba(197,122,42,0.18), transparent 60%), radial-gradient(820px 300px at 92% 10%, rgba(31,157,138,0.14), transparent 55%)",
+      }}
+    >
       {children}
     </div>
   )
@@ -95,7 +101,9 @@ function PageWrapper({ children }) {
 }
 function WrapSurface({ children, className = '' }) {
   return (
-    <div className={`max-w-5xl mx-auto bg-white/10 rounded-3xl p-4 md:p-6 ${className}`}>
+    <div
+      className={`max-w-6xl mx-auto bg-white border border-line shadow-soft rounded-3xl p-4 md:p-6 ${className}`}
+    >
       {children}
     </div>
   )

@@ -9,7 +9,7 @@ export default function Logo({ size = 56 }) {
         width: size,
         height: size,
         background:
-          "conic-gradient(from 180deg, #FBBF24, #F59E0B, #0F172A, #FBBF24)",
+          "conic-gradient(from 180deg, #D4AF37, #5A4632, #111111, #D4AF37)",
       }}
     >
       <img

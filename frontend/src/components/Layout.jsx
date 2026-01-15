@@ -18,7 +18,7 @@ function SideItem({ to, children }) {
       to={to}
       className={({ isActive }) =>
         `block w-full text-left px-4 py-2 rounded-xl transition
-         ${isActive ? "bg-white text-black shadow-sm" : "text-white/90 hover:bg-white/10"}`
+         ${isActive ? "bg-gold text-white shadow-soft" : "text-ink hover:bg-base"}`
       }
     >
       {children}
@@ -32,10 +32,10 @@ function SideItem({ to, children }) {
  */
 export default function Layout({ children, className = "" }) {
   return (
-    <div className={`min-h-screen bg-transparent text-white ${className}`}>
+    <div className={`min-h-screen bg-transparent text-ink ${className}`}>
       {/* Header شفاف */}
       <header
-        className="sticky top-0 z-30 bg-transparent backdrop-blur border-b border-white/10"
+        className="sticky top-0 z-30 bg-white/70 backdrop-blur border-b border-line"
         role="banner"
       >
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
@@ -51,7 +51,7 @@ export default function Layout({ children, className = "" }) {
 
             <div className="leading-tight">
               <div className="font-bold tracking-wide text-base md:text-lg">Zaad Bakery</div>
-              <div className="text-white/70 text-xs md:text-sm">Egyptian Bakery</div>
+              <div className="text-mute text-xs md:text-sm">Egyptian Bakery</div>
             </div>
           </Link>
 
@@ -62,7 +62,7 @@ export default function Layout({ children, className = "" }) {
       <div className="mx-auto max-w-7xl px-2 md:px-4 py-4 md:py-6 flex gap-4">
         {/* Sidebar شفاف مع حد خفيف */}
         <aside
-          className="hidden md:flex md:w-60 shrink-0 bg-transparent border border-white/10 rounded-2xl p-3 backdrop-blur"
+          className="hidden md:flex md:w-60 shrink-0 bg-white border border-line rounded-2xl p-3 shadow-soft"
           role="navigation"
           aria-label="Sidebar"
         >
@@ -77,12 +77,12 @@ export default function Layout({ children, className = "" }) {
                 draggable="false"
               />
               <div className="leading-tight">
-                <div className="text-sm font-semibold opacity-95">Zaad Bakery</div>
-                <div className="text-xs opacity-70">Egyptian Bakery</div>
+                <div className="text-sm font-semibold">Zaad Bakery</div>
+                <div className="text-xs text-mute">Egyptian Bakery</div>
               </div>
             </Link>
 
-            <div className="h-px bg-white/10 my-1" />
+            <div className="h-px bg-line my-1" />
 
             <SideItem to="/overview">Overview</SideItem>
             <SideItem to="/summery">Summary</SideItem>

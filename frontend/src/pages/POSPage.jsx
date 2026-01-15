@@ -112,7 +112,7 @@ export default function POSPage(){
         <div className="space-y-2">
           {filtered.map(p=>(
             <button key={p.barcode}
-                    className="block w-full text-left border border-line rounded-xl px-3 py-2 hover:bg-surface"
+                    className="block w-full text-left border border-line rounded-xl px-3 py-2 hover:bg-base"
                     onClick={()=>addToCart(p)}>
               <div className="font-medium">{p.name}</div>
               <div className="text-xs text-mute">KSh {p.salePrice} — #{p.barcode}</div>
@@ -152,15 +152,15 @@ export default function POSPage(){
 
           {/* Discount (amount) */}
           <label className="block">
-            <span className="block text-white/70 mb-1">Discount (amount)</span>
-            <input type="number" min="0" className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+            <span className="block text-mute mb-1">Discount (amount)</span>
+            <input type="number" min="0" className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                    value={discount} onChange={e=>setDiscount(+e.target.value || 0)} />
           </label>
 
           {/* Payment method: Cash / Till / Withdrawal */}
           <label className="block">
-            <span className="block text-white/70 mb-1">Payment Method</span>
-            <select className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+            <span className="block text-mute mb-1">Payment Method</span>
+            <select className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                     value={payment} onChange={e=>setPayment(e.target.value)}>
               <option value="cash">Cash</option>
               <option value="till">Till</option>
@@ -172,26 +172,26 @@ export default function POSPage(){
           {payment === 'cash' && (
             <>
               <label className="block">
-                <span className="block text-white/70 mb-1">Received</span>
-                <input type="number" min="0" className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+                <span className="block text-mute mb-1">Received</span>
+                <input type="number" min="0" className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                       value={received} onChange={e=>setReceived(+e.target.value || 0)} />
               </label>
               <div className="flex justify-between">
-                <span className="text-white/70">Change</span>
+                <span className="text-mute">Change</span>
                 <strong>{fmt(change)}</strong>
               </div>
             </>
           )}
 
-          <div className="flex items-center justify-between border-t border-white/10 pt-3 mt-3">
-            <span className="text-white/90">TOTAL</span>
+          <div className="flex items-center justify-between border-t border-line pt-3 mt-3">
+            <span className="text-ink">TOTAL</span>
             <b className="text-2xl">{fmt(total)}</b>
           </div>
 
           {/* Add Loyalty Points */}
           <label className="block">
-            <span className="block text-white/70 mb-1">Add Loyalty Points</span>
-            <input type="number" min="0" className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+            <span className="block text-mute mb-1">Add Loyalty Points</span>
+            <input type="number" min="0" className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                    value={addPoints} onChange={e=>setAddPoints(+e.target.value || 0)} />
           </label>
 
@@ -201,7 +201,7 @@ export default function POSPage(){
             <div className="space-y-2 max-h-52 overflow-auto">
               {clients.map(c => (
                 <button key={c.phone}
-                        className={`block w-full text-left border border-line rounded-xl px-3 py-2 ${client?.phone===c.phone? 'bg-surface':''}`}
+                        className={`block w-full text-left border border-line rounded-xl px-3 py-2 ${client?.phone===c.phone? 'bg-base':''}`}
                         onClick={()=>setClient(c)}>
                   <div className="font-medium">{c.name}</div>
                   <div className="text-xs text-mute">+{c.phone}</div>

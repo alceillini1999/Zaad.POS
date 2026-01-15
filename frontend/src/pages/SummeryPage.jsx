@@ -212,27 +212,27 @@ export default function SummeryPage() {
   }
 
   return (
-    <div className="page-surface">
+    <div className="summery-page">
       {/* Date range */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <label className="text-white/80">From</label>
+        <label className="text-mute">From</label>
         <input
           type="date"
-          className="rounded-xl bg-white/90 text-black px-3 py-2"
+          className="rounded-xl border border-line bg-white px-3 py-2 text-ink"
           value={fromDate}
           max={toDate}
           onChange={(e) => setFromDate(e.target.value)}
         />
-        <label className="text-white/80">To</label>
+        <label className="text-mute">To</label>
         <input
           type="date"
-          className="rounded-xl bg-white/90 text-black px-3 py-2"
+          className="rounded-xl border border-line bg-white px-3 py-2 text-ink"
           value={toDate}
           min={fromDate}
           onChange={(e) => setToDate(e.target.value)}
         />
         {!isSingleDay && (
-          <div className="text-sm text-white/60">
+          <div className="text-sm text-mute">
             Cashier section works when From = To (single day).
           </div>
         )}
@@ -240,34 +240,34 @@ export default function SummeryPage() {
 
       {/* High-level summary cards */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-4 mb-6">
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Total Sales</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Total Sales</div>
           <div className="text-3xl font-semibold">{K(totals.totalSales)}</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Cash Sales</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Cash Sales</div>
           <div className="text-3xl font-semibold">{K(totals.cashSales)}</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Till Sales</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Till Sales</div>
           <div className="text-3xl font-semibold">{K(totals.tillSales)}</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Withdrawal (POS)</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Withdrawal (POS)</div>
           <div className="text-3xl font-semibold">{K(totals.withdrawalSales)}</div>
-          <div className="text-xs text-white/50 mt-1">
+          <div className="text-xs text-mute mt-1">
             Sum of records where paymentMethod = withdrawal
           </div>
         </div>
       </div>
 
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 mb-6">
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Expenses</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Expenses</div>
           <div className="text-3xl font-semibold">{K(totals.totalExpenses)}</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Net Profit</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Net Profit</div>
           <div className="text-3xl font-semibold">{K(totals.netProfit)}</div>
         </div>
       </div>
@@ -275,50 +275,50 @@ export default function SummeryPage() {
       {/* Cashier accounting */}
       <Section title="Cashier Accounting — Opening + Sales − Withdrawals">
         {!isSingleDay ? (
-          <div className="text-white/70">
+          <div className="text-mute">
             Select a single day to manage opening balances and withdrawal details.
           </div>
         ) : (
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
             {/* Opening */}
-            <div className="rounded-2xl border border-white/10 p-4">
-              <div className="text-white/80 font-semibold mb-3">Opening Amounts</div>
+            <div className="rounded-2xl border border-line bg-base p-4">
+              <div className="text-ink font-semibold mb-3">Opening Amounts</div>
 
               <label className="block mb-3">
-                <span className="block text-white/70 mb-1">Opening Cash</span>
+                <span className="block text-mute mb-1">Opening Cash</span>
                 <input
                   type="number"
                   min="0"
-                  className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                   value={openingCash}
                   onChange={(e) => setOpeningCash(+e.target.value || 0)}
                 />
               </label>
 
               <label className="block">
-                <span className="block text-white/70 mb-1">Opening Till</span>
+                <span className="block text-mute mb-1">Opening Till</span>
                 <input
                   type="number"
                   min="0"
-                  className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                   value={openingTill}
                   onChange={(e) => setOpeningTill(+e.target.value || 0)}
                 />
               </label>
 
-              <div className="text-xs text-white/50 mt-3">
+              <div className="text-xs text-mute mt-3">
                 For {dayKey}: values are auto-saved (local storage).
               </div>
             </div>
 
             {/* Add Withdrawal */}
-            <div className="rounded-2xl border border-white/10 p-4">
-              <div className="text-white/80 font-semibold mb-3">Record Withdrawal (Details)</div>
+            <div className="rounded-2xl border border-line bg-base p-4">
+              <div className="text-ink font-semibold mb-3">Record Withdrawal (Details)</div>
 
               <label className="block mb-3">
-                <span className="block text-white/70 mb-1">From</span>
+                <span className="block text-mute mb-1">From</span>
                 <select
-                  className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                   value={wSource}
                   onChange={(e) => setWSource(e.target.value)}
                 >
@@ -328,20 +328,20 @@ export default function SummeryPage() {
               </label>
 
               <label className="block mb-3">
-                <span className="block text-white/70 mb-1">Amount</span>
+                <span className="block text-mute mb-1">Amount</span>
                 <input
                   type="number"
                   min="0"
-                  className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                   value={wAmount}
                   onChange={(e) => setWAmount(+e.target.value || 0)}
                 />
               </label>
 
               <label className="block mb-3">
-                <span className="block text-white/70 mb-1">Note (optional)</span>
+                <span className="block text-mute mb-1">Note (optional)</span>
                 <input
-                  className="w-full rounded-xl bg-white/90 text-black px-3 py-2"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
                   value={wNote}
                   onChange={(e) => setWNote(e.target.value)}
                   placeholder="Reason / reference..."
@@ -352,7 +352,7 @@ export default function SummeryPage() {
                 Add Withdrawal
               </button>
 
-              <div className="mt-4 text-sm text-white/80">
+              <div className="mt-4 text-sm text-ink">
                 <div className="flex justify-between">
                   <span>Withdrawals (Cash)</span>
                   <b>{K(withdrawalManual.cash)}</b>
@@ -361,7 +361,7 @@ export default function SummeryPage() {
                   <span>Withdrawals (Till)</span>
                   <b>{K(withdrawalManual.till)}</b>
                 </div>
-                <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
+                <div className="flex justify-between border-t border-line pt-2 mt-2">
                   <span>Total Withdrawals</span>
                   <b>{K(withdrawalManual.total)}</b>
                 </div>
@@ -369,25 +369,25 @@ export default function SummeryPage() {
             </div>
 
             {/* Balances */}
-            <div className="rounded-2xl border border-white/10 p-4">
-              <div className="text-white/80 font-semibold mb-3">Expected Cashier Balance</div>
+            <div className="rounded-2xl border border-line bg-base p-4">
+              <div className="text-ink font-semibold mb-3">Expected Cashier Balance</div>
 
-              <div className="flex justify-between items-center rounded-xl bg-white/5 p-3 mb-3">
-                <span className="text-white/80">Cash in Drawer</span>
+              <div className="flex justify-between items-center rounded-xl bg-white border border-line p-3 mb-3">
+                <span className="text-mute">Cash in Drawer</span>
                 <b className="text-xl">{K(cashierBalances?.cash || 0)}</b>
               </div>
 
-              <div className="flex justify-between items-center rounded-xl bg-white/5 p-3 mb-3">
-                <span className="text-white/80">Till Balance</span>
+              <div className="flex justify-between items-center rounded-xl bg-white border border-line p-3 mb-3">
+                <span className="text-mute">Till Balance</span>
                 <b className="text-xl">{K(cashierBalances?.till || 0)}</b>
               </div>
 
-              <div className="flex justify-between items-center border-t border-white/10 pt-3">
-                <span className="text-white/80">Total on Hand</span>
+              <div className="flex justify-between items-center border-t border-line pt-3">
+                <span className="text-mute">Total on Hand</span>
                 <b className="text-2xl">{K(cashierBalances?.grand || 0)}</b>
               </div>
 
-              <div className="text-xs text-white/50 mt-2">
+              <div className="text-xs text-mute mt-2">
                 Calculation:
                 Cash = Opening Cash + Cash Sales − Cash Withdrawals
                 / Till = Opening Till + Till Sales − Till Withdrawals
@@ -400,14 +400,14 @@ export default function SummeryPage() {
       {/* Manual Withdrawal Details */}
       <Section title="Withdrawals (Manual) — Details">
         {!isSingleDay ? (
-          <div className="text-white/70">
+          <div className="text-mute">
             Select a single day to view/manage manual withdrawals.
           </div>
         ) : (
           <div className="overflow-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-white/70 border-b border-white/10">
+                <tr className="text-left text-mute border-b border-line">
                   <th className="py-2 pr-3">Time</th>
                   <th className="py-2 pr-3">Source</th>
                   <th className="py-2 pr-3">Amount</th>
@@ -417,7 +417,7 @@ export default function SummeryPage() {
               </thead>
               <tbody>
                 {withdrawals.map((w) => (
-                  <tr key={w.id} className="border-b border-white/5 text-white/85">
+                  <tr key={w.id} className="border-b border-line text-ink">
                     <td className="py-2 pr-3">{fmtT(w.time)}</td>
                     <td className="py-2 pr-3">{w.source === "cash" ? "Cash" : "Till"}</td>
                     <td className="py-2 pr-3">{K(w.amount)}</td>
@@ -431,7 +431,7 @@ export default function SummeryPage() {
                 ))}
                 {!withdrawals.length && (
                   <tr>
-                    <td colSpan={5} className="py-3 text-white/60">
+                    <td colSpan={5} className="py-3 text-mute">
                       No manual withdrawals recorded for this day.
                     </td>
                   </tr>
@@ -447,7 +447,7 @@ export default function SummeryPage() {
         <div className="overflow-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-white/70 border-b border-white/10">
+              <tr className="text-left text-mute border-b border-line">
                 <th className="py-2 pr-3">Date</th>
                 <th className="py-2 pr-3">Time</th>
                 <th className="py-2 pr-3">Total</th>
@@ -457,7 +457,7 @@ export default function SummeryPage() {
             </thead>
             <tbody>
               {posWithdrawals.map((r, idx) => (
-                <tr key={r.id || r.invoiceNo || idx} className="border-b border-white/5 text-white/85">
+                <tr key={r.id || r.invoiceNo || idx} className="border-b border-line text-ink">
                   <td className="py-2 pr-3">{fmtD(r.createdAt)}</td>
                   <td className="py-2 pr-3">{fmtT(r.createdAt)}</td>
                   <td className="py-2 pr-3">{K(r.total)}</td>
@@ -467,7 +467,7 @@ export default function SummeryPage() {
               ))}
               {!posWithdrawals.length && (
                 <tr>
-                  <td colSpan={5} className="py-3 text-white/60">
+                  <td colSpan={5} className="py-3 text-mute">
                     No POS withdrawals in selected range.
                   </td>
                 </tr>
@@ -482,7 +482,7 @@ export default function SummeryPage() {
         <div className="overflow-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-white/70 border-b border-white/10">
+              <tr className="text-left text-mute border-b border-line">
                 <th className="py-2 pr-3">Date</th>
                 <th className="py-2 pr-3">Title/Category</th>
                 <th className="py-2 pr-3">Amount</th>
@@ -490,7 +490,7 @@ export default function SummeryPage() {
             </thead>
             <tbody>
               {expensesInRange.map((e, idx) => (
-                <tr key={idx} className="border-b border-white/5 text-white/85">
+                <tr key={idx} className="border-b border-line text-ink">
                   <td className="py-2 pr-3">{fmtD(e.date)}</td>
                   <td className="py-2 pr-3">{e.title || e.category || e.note || "—"}</td>
                   <td className="py-2 pr-3">{K(e.amount)}</td>
@@ -498,7 +498,7 @@ export default function SummeryPage() {
               ))}
               {!expensesInRange.length && (
                 <tr>
-                  <td colSpan={3} className="py-3 text-white/60">
+                  <td colSpan={3} className="py-3 text-mute">
                     No expenses in selected range.
                   </td>
                 </tr>

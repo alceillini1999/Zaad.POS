@@ -69,7 +69,7 @@ export default function Login() {
               placeholder="مثال: ahmed"
               autoComplete="username"
               style={forceBlackInputStyle}
-              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gold/40"
             />
           </div>
 
@@ -83,7 +83,7 @@ export default function Login() {
               placeholder="مثال: 1999"
               autoComplete="current-password"
               style={forceBlackInputStyle}
-              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gold/40"
             />
           </div>
 
@@ -92,7 +92,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 rounded-lg shadow disabled:opacity-60"
+            className="w-full bg-gold hover:brightness-95 text-white font-semibold py-2 rounded-lg shadow disabled:opacity-60"
           >
             {loading ? "جارٍ الدخول..." : "دخول"}
           </button>

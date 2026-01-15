@@ -50,7 +50,7 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-3">
             <button className="px-3 py-2 rounded border hover:bg-gray-100 text-sm">Filter</button>
-            <button className="px-4 py-2 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-sm">New Sale</button>
+            <button className="px-4 py-2 rounded bg-gold hover:brightness-95 text-white text-sm">New Sale</button>
           </div>
         </div>
 
@@ -133,7 +133,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl shadow p-6 mt-6">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">Quick Actions</h3>
           <div className="flex flex-wrap gap-3">
-            <button className="px-4 py-2 bg-yellow-500 text-white rounded-lg">New Order</button>
+            <button className="px-4 py-2 bg-gold hover:brightness-95 text-white rounded-lg">New Order</button>
             <button className="px-4 py-2 border rounded-lg">Add Product</button>
             <button className="px-4 py-2 border rounded-lg">Add Client</button>
             <button className="px-4 py-2 border rounded-lg">Export CSV</button>

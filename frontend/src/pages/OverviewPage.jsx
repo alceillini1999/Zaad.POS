@@ -82,49 +82,49 @@ export default function OverviewPage() {
   },[sales, expenses, dFrom, dTo, oneDay])
 
   return (
-    <div className="page-surface overview-page">
+    <div className="overview-page">
       {/* شريط نطاق التاريخ */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <label className="text-white/80">From</label>
-        <input type="date" className="rounded-xl bg-white/90 text-black px-3 py-2"
+        <label className="text-mute">From</label>
+        <input type="date" className="rounded-xl border border-line bg-white px-3 py-2 text-ink"
                value={fromDate} max={toDate} onChange={e=>setFromDate(e.target.value)} />
-        <label className="text-white/80">To</label>
-        <input type="date" className="rounded-xl bg-white/90 text-black px-3 py-2"
+        <label className="text-mute">To</label>
+        <input type="date" className="rounded-xl border border-line bg-white px-3 py-2 text-ink"
                value={toDate} min={fromDate} onChange={e=>setToDate(e.target.value)} />
       </div>
 
       {/* الكروت */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mb-6">
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Total Sales</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Total Sales</div>
           <div className="text-3xl font-semibold">{K(totals.totalSales)}</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Expenses</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Expenses</div>
           <div className="text-3xl font-semibold">{K(totals.totalExpenses)}</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Net Profit</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Net Profit</div>
           <div className="text-3xl font-semibold">{K(totals.netProfit)}</div>
         </div>
       </div>
 
       {/* تفصيل طرق إدخال المال (تُحسب تلقائيًا من مبيعات POS ضمن الفترة) */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mb-6">
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Cash</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Cash</div>
           <div className="text-3xl font-semibold">{K(totals.cash)}</div>
-          <div className="text-xs text-white/50 mt-1">إجمالي المبيعات المدفوعة Cash</div>
+          <div className="text-xs text-mute mt-1">إجمالي المبيعات المدفوعة Cash</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Till</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Till</div>
           <div className="text-3xl font-semibold">{K(totals.till)}</div>
-          <div className="text-xs text-white/50 mt-1">إجمالي المبيعات المدفوعة Till</div>
+          <div className="text-xs text-mute mt-1">إجمالي المبيعات المدفوعة Till</div>
         </div>
-        <div className="rounded-2xl p-4 bg-transparent border border-white/10 backdrop-blur">
-          <div className="text-white/70 mb-1">Withdrawal</div>
+        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
+          <div className="text-mute mb-1">Withdrawal</div>
           <div className="text-3xl font-semibold">{K(totals.withdrawal)}</div>
-          <div className="text-xs text-white/50 mt-1">إجمالي العمليات المُسجَّلة Withdrawal</div>
+          <div className="text-xs text-mute mt-1">إجمالي العمليات المُسجَّلة Withdrawal</div>
         </div>
       </div>
 
@@ -134,27 +134,27 @@ export default function OverviewPage() {
           <ResponsiveContainer>
             {oneDay ? (
               <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                <CartesianGrid stroke="rgba(255,255,255,0.22)" strokeDasharray="4 4" />
-                <XAxis dataKey="label" stroke="#ffffff" tick={{ fill:'#ffffff' }} tickMargin={8}/>
-                <YAxis stroke="#ffffff" tick={{ fill:'#ffffff' }} tickMargin={8}/>
-                <Tooltip contentStyle={{ background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff' }}
-                         labelStyle={{ color:'#fff' }} />
-                <Legend wrapperStyle={{ color:'#fff' }} />
-                <Line type="monotone" dataKey="sales"    name="Sales"      stroke="#F59E0B" strokeWidth={3} dot={false}/>
-                <Line type="monotone" dataKey="expenses" name="Expenses"   stroke="#EF4444" strokeWidth={3} dot={false}/>
-                <Line type="monotone" dataKey="net"      name="Net Profit" stroke="#22C55E" strokeWidth={3} dot={false}/>
+                <CartesianGrid stroke="rgba(15,23,42,0.12)" strokeDasharray="4 4" />
+                <XAxis dataKey="label" stroke="#64748B" tick={{ fill:'#64748B' }} tickMargin={8}/>
+                <YAxis stroke="#64748B" tick={{ fill:'#64748B' }} tickMargin={8}/>
+                <Tooltip contentStyle={{ background:'#FFFFFF', border:'1px solid #E2E8F0', color:'#0F172A' }}
+                         labelStyle={{ color:'#0F172A' }} />
+                <Legend wrapperStyle={{ color:'#64748B' }} />
+                <Line type="monotone" dataKey="sales"    name="Sales"      stroke="#C57A2A" strokeWidth={3} dot={false}/>
+                <Line type="monotone" dataKey="expenses" name="Expenses"   stroke="#DC2626" strokeWidth={3} dot={false}/>
+                <Line type="monotone" dataKey="net"      name="Net Profit" stroke="#16A34A" strokeWidth={3} dot={false}/>
               </LineChart>
             ) : (
               <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                <CartesianGrid stroke="rgba(255,255,255,0.22)" strokeDasharray="4 4" />
-                <XAxis dataKey="label" stroke="#ffffff" tick={{ fill:'#ffffff' }} tickMargin={8}/>
-                <YAxis stroke="#ffffff" tick={{ fill:'#ffffff' }} tickMargin={8}/>
-                <Tooltip contentStyle={{ background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff' }}
-                         labelStyle={{ color:'#fff' }} />
-                <Legend wrapperStyle={{ color:'#fff' }} />
-                <Area type="monotone" dataKey="sales"    name="Sales"      stroke="#F59E0B" fill="rgba(245,158,11,.22)"  strokeWidth={3}/>
-                <Area type="monotone" dataKey="expenses" name="Expenses"   stroke="#EF4444" fill="rgba(239,68,68,.18)" strokeWidth={3}/>
-                <Area type="monotone" dataKey="net"      name="Net Profit" stroke="#22C55E" fill="rgba(34,197,94,.18)" strokeWidth={3}/>
+                <CartesianGrid stroke="rgba(15,23,42,0.12)" strokeDasharray="4 4" />
+                <XAxis dataKey="label" stroke="#64748B" tick={{ fill:'#64748B' }} tickMargin={8}/>
+                <YAxis stroke="#64748B" tick={{ fill:'#64748B' }} tickMargin={8}/>
+                <Tooltip contentStyle={{ background:'#FFFFFF', border:'1px solid #E2E8F0', color:'#0F172A' }}
+                         labelStyle={{ color:'#0F172A' }} />
+                <Legend wrapperStyle={{ color:'#64748B' }} />
+                <Area type="monotone" dataKey="sales"    name="Sales"      stroke="#C57A2A" fill="rgba(197,122,42,.18)"  strokeWidth={3}/>
+                <Area type="monotone" dataKey="expenses" name="Expenses"   stroke="#DC2626" fill="rgba(220,38,38,.14)" strokeWidth={3}/>
+                <Area type="monotone" dataKey="net"      name="Net Profit" stroke="#16A34A" fill="rgba(22,163,74,.12)" strokeWidth={3}/>
               </AreaChart>
             )}
           </ResponsiveContainer>

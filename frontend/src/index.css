@@ -2,203 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== حركة التدرّج الخلفي ===== */
-@keyframes brandGradient {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* =========================================================
+   Zaad Bakery – Theme 01 (Bakery Modern)
+   هدف الملف: واجهة فاتحة، نظيفة، واحترافية.
+   ========================================================= */
+
+:root {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-2: #F1F5F9;
+  --border: #E2E8F0;
+
+  --text: #0F172A;
+  --muted: #64748B;
+
+  --primary: #C57A2A;
+  --primary-2: #D59A55;
+  --primary-hover: #B56E24;
+  --secondary: #1F9D8A;
+
+  /* ✅ كان موجود لتعديل توسيط المودال مع Sidebar.
+     في الثيم الفاتح نرجعه 0 لأنه عادة لا يلزم. */
+  --modal-shift-x: 0px;
 }
 
-/* ===== متغيرات الثيم (Modern / Professional) ===== */
-:root{
-  /* Accent */
-  --accent-1: #F59E0B;   /* amber-500 */
-  --accent-2: #FBBF24;   /* amber-400 */
-  --accent-brd: #D97706; /* amber-600 */
-
-  /* Glass */
-  --glass-alpha: 0.18;
-  --glass-bg: rgba(0,0,0,var(--glass-alpha));
-  --glass-brd: rgba(255,255,255,0.10);
-  --glass-blur: 8px;
-
-  /* ✅ إزاحة المودال لليسار لتوسيطه على كامل الشاشة مع وجود Sidebar */
-  --modal-shift-x: -480px; /* كما هو */
+html, body, #root { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 }
 
-/* ===== حركة اللمعان (Breathing Glow) ===== */
-@keyframes goldGlow {
-  0% { box-shadow: 0 0 8px 2px rgba(245,158,11,0.22), 0 0 22px rgba(251,191,36,0.10); }
-  50% { box-shadow: 0 0 16px 4px rgba(245,158,11,0.42), 0 0 34px rgba(251,191,36,0.18); }
-  100% { box-shadow: 0 0 8px 2px rgba(245,158,11,0.22), 0 0 22px rgba(251,191,36,0.10); }
-}
+::selection { background: rgba(197, 122, 42, 0.22); }
 
-/* ===== حركة مسار الضوء الذهبي عبر الشاشة ===== */
-@keyframes sweepLight {
-  0%   { background-position: -60% -60%; }
-  50%  { background-position:  50%  50%; }
-  100% { background-position: 160% 160%; }
-}
+/* =========================================================
+   Base surfaces
+   ========================================================= */
 
-html, body, #root { height: 100%; background: transparent !important; }
-
-/* ===== طبقات الخلفية (تُستخدم في AppBackground.jsx) ===== */
-.bg-animated{
-  /* خلفية داكنة مودرن (Slate/Navy) مع لمسة Amber خفيفة */
-  background: linear-gradient(-45deg,
-    #0B1220 0%,
-    #0F172A 28%,
-    #111827 52%,
-    #0B1220 76%,
-    rgba(245,158,11,0.22) 100%);
-  background-size: 300% 300%;
-  animation: brandGradient 16s ease-in-out infinite;
-  filter: saturate(1.02);
-}
-
-/* شعاع ضوء ذهبي يتحرك قطريًا ببطء */
-.bg-light-sweep{
-  background:
-    radial-gradient(60% 40% at 0% 0%,
-      rgba(251,191,36,0.22) 0%,
-      rgba(245,158,11,0.10) 35%,
-      rgba(245,158,11,0.06) 55%,
-      rgba(0,0,0,0.0) 70%);
-  background-repeat: no-repeat;
-  background-size: 120% 120%;
-  animation: sweepLight 24s linear infinite;
-  mix-blend-mode: screen;
-  opacity: .6;
-}
-
-/* Noise خفيف جدًّا لعمق بصري أنيق */
-.bg-noise{
-  background-image:
-    radial-gradient(rgba(255,255,255,0.03) 0.5px, transparent 0.5px);
-  background-size: 2px 2px;
-  opacity: .25;
-  mix-blend-mode: overlay;
-}
-
-/* ===== الزجاج العام ===== */
-
-aside, .sidebar, .sidebar-container, .app-sidebar, [data-role="sidebar"],
-header, .topbar, .app-header, [data-role="topbar"] {
-  background: var(--glass-bg) !important;
-  border-color: var(--glass-brd);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-}
-
-/* الغلاف العام للصفحات */
 .page-surface {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-brd);
-  border-radius: 16px;
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  box-shadow:
-    0 6px 24px rgba(0,0,0,0.22),
-    inset 0 1px 0 rgba(255,255,255,0.05);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
   padding: 20px;
-  margin: 16px;
 }
 
-/* نصوص بيضاء افتراضيًا (للواجهة العامة فقط) */
-body, main, header, aside, .page-surface,
-.card, .content-card, .panel, .box,
-.table-wrapper, .table-container {
-  color: #ffffff !important;
-}
-
-/* Recharts */
+/* Recharts: لا نضيف خلفية */
 .recharts-wrapper, .recharts-surface { background: transparent !important; }
 
 /* =========================================================
-   ✅ إصلاح الشفافية الزائدة:
-   لا تجعل bg-white / bg-gray... شفافة، لأن المودال يعتمد عليها.
-   بدلاً من ذلك، نجعل فقط حاويات الصفحة الكبيرة شفافة.
+   Buttons
    ========================================================= */
-body > div, #root > div,
-main, .main, .content, .content-root, .layout, .layout-root,
-.app-layout, .layout-content, .app-content, .page, .page-root,
-.container, .container-fluid, .wrapper, .page-wrapper,
-table, thead, tbody, .table, .table-root, .table-container {
-  background: transparent !important;
-}
 
-/* ===== زر ذهبي موحّد ===== */
+.btn {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-weight: 600;
+  transition: transform .15s ease, filter .15s ease, background-color .15s ease, border-color .15s ease;
+}
+.btn:hover { background: var(--surface-2); transform: translateY(-1px); }
+.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+/* زر أساسي (Caramel) */
 .btn-gold, .button-gold, .btn-primary-gold {
-  background: linear-gradient(180deg, var(--accent-2), var(--accent-1));
-  color: #111;
-  border: 1px solid var(--accent-brd);
+  background: linear-gradient(180deg, var(--primary-2), var(--primary));
+  color: #fff;
+  border: 1px solid rgba(181, 110, 36, 0.45);
   border-radius: 12px;
   padding: 8px 14px;
-  font-weight: 600;
-  box-shadow: 0 0 10px rgba(245,158,11,.22);
-  transition: all 0.3s ease-in-out;
+  font-weight: 700;
+  box-shadow: 0 10px 22px rgba(197, 122, 42, 0.18);
+  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
 }
 .btn-gold:hover,
 .btn-gold:focus,
 .button-gold:hover,
 .button-gold:focus {
-  filter: brightness(1.05);
+  filter: brightness(0.98);
   transform: translateY(-1px);
-  animation: goldGlow 2.5s infinite ease-in-out;
+  box-shadow: 0 12px 26px rgba(197, 122, 42, 0.22);
   outline: none;
 }
 
-/* ===== الأزرار العامة ===== */
-button:focus,
-.btn:focus {
-  outline: none;
-  animation: goldGlow 2.5s infinite ease-in-out;
-}
-button:hover {
-  filter: brightness(1.03);
-  transform: translateY(-1px);
-  transition: all 0.25s ease-in-out;
+/* Focus ring عام */
+:focus-visible {
+  outline: 3px solid rgba(197, 122, 42, 0.28);
+  outline-offset: 2px;
 }
 
-/* ===== WhatsApp Page: طبقتان واضحتان + أزرار ذهبية ===== */
-.whatsapp-page.page-surface { background: rgba(0,0,0,0.26); }
-.whatsapp-page .card,
-.whatsapp-page .panel,
-.whatsapp-page .box,
-.whatsapp-page .content-card { background: rgba(0,0,0,0.36) !important; }
-.whatsapp-page .btn, .whatsapp-page button {
-  background: linear-gradient(180deg, var(--accent-2), var(--accent-1)) !important;
-  color: #111 !important;
-  border: 1px solid var(--accent-brd) !important;
-  animation: goldGlow 2.5s infinite ease-in-out;
-}
+/* =========================================================
+   Inputs (افتراضي نظيف)
+   ========================================================= */
 
-/* ===== جداول الصفحات: نص أسود ===== */
-.products-page table th, .products-page table td,
-.expenses-page table th, .expenses-page table td,
-.clients-page  table th, .clients-page  table td,
-.sales-page    table th, .sales-page    table td {
-  color: #111 !important;
-  background: transparent !important;
-}
-
-/* ===== أزرار الصفحات ===== */
-.products-page .btn, .products-page button,
-.expenses-page .btn, .expenses-page button,
-.clients-page  .btn, .clients-page  button,
-.sales-page    .btn, .sales-page    button {
-  background: linear-gradient(180deg, var(--accent-2), var(--accent-1)) !important;
-  color: #111 !important;
-  border: 1px solid var(--accent-brd) !important;
-  animation: goldGlow 2.5s infinite ease-in-out;
-}
-
-/* ===== إزالة الفوتر ===== */
-footer, .pm-footer, footer.pm-footer, [data-role="footer"] {
-  display: none !important;
-}
-
-/* ===== الحقول البيضاء ===== */
 input[type="text"],
 input[type="number"],
 input[type="date"],
@@ -208,77 +106,33 @@ input[type="tel"],
 input[type="search"],
 textarea,
 select {
-  color: #111 !important;
-  caret-color: #111 !important;
-  background: rgba(255,255,255,0.95) !important;
-  border: 1px solid var(--accent-brd) !important;
-  border-radius: 8px;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  color: var(--text);
+  caret-color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-/* Placeholder text */
 input::placeholder,
 textarea::placeholder {
-  color: rgba(0,0,0,0.55) !important;
+  color: rgba(100, 116, 139, 0.85);
 }
 
-/* داخل الزجاج */
-.page-surface input,
-.page-surface textarea,
-.page-surface select {
-  color: #111 !important;
-}
-
-/* ===== تأثير التركيز (Focus) الذهبي للحقول ===== */
 input:focus,
 textarea:focus,
 select:focus {
-  outline: none !important;
-  border-color: var(--accent-2) !important;
-  background: rgba(255,255,255,0.98) !important;
-  animation: goldGlow 2.5s infinite ease-in-out;
-}
-
-/* ===== الحقول المعطّلة ===== */
-input:disabled,
-textarea:disabled,
-select:disabled {
-  color: rgba(0,0,0,0.5) !important;
-  opacity: 0.8;
+  outline: none;
+  border-color: rgba(197, 122, 42, 0.55);
+  box-shadow: 0 0 0 3px rgba(197, 122, 42, 0.16);
 }
 
 /* =========================================================
-   ✅ إصلاح وضوح المودالات (Products/Expenses/Clients):
-   أي مودال/نافذة تستخدم bg-white أو background أبيض نثبتها.
-   ========================================================= */
-.products-page .bg-white,
-.expenses-page .bg-white,
-.clients-page  .bg-white,
-.products-page [role="dialog"],
-.expenses-page [role="dialog"],
-.clients-page  [role="dialog"],
-.products-page .modal,
-.expenses-page .modal,
-.clients-page  .modal {
-  background: #ffffff !important;
-  color: #111 !important;
-}
-
-/* النصوص داخل الفورم في هذه الصفحات */
-.products-page label,
-.expenses-page label,
-.clients-page  label {
-  color: #111 !important;
-  font-weight: 600;
-}
-
-/* =========================================================
-   ✅ FIX نهائي لتوسيط المودال:
-   - نلغي التأثير الذي يكسر position:fixed (will-change:transform)
-   - نثبت Overlay الحقيقي (fixed inset-0 z-50) أنه يغطي الشاشة ويتوسّط
+   Modal centering hardening (legacy fix)
    ========================================================= */
 
-/* 1) تعطيل will-change: transform في Wrapper (الموجود في DevTools) */
+/* 1) تعطيل will-change: transform في Wrapper */
 .products-page [style*="will-change: transform"],
 .clients-page  [style*="will-change: transform"],
 .expenses-page [style*="will-change: transform"],
@@ -286,7 +140,7 @@ select:disabled {
   will-change: auto !important;
 }
 
-/* 2) تثبيت الـ Overlay الحقيقي: fixed inset-0 z-50 */
+/* 2) تثبيت الـ Overlay الحقيقي */
 .products-page .fixed.inset-0.z-50,
 .clients-page  .fixed.inset-0.z-50,
 .expenses-page .fixed.inset-0.z-50,
@@ -303,7 +157,7 @@ select:disabled {
   z-index: 10000 !important;
 }
 
-/* 3) تحسين بسيط: إذا كان الصندوق طويل، لا يخرج خارج الشاشة */
+/* 3) إذا كان الصندوق طويل */
 .products-page .fixed.inset-0.z-50 .bg-white,
 .clients-page  .fixed.inset-0.z-50 .bg-white,
 .expenses-page .fixed.inset-0.z-50 .bg-white,
@@ -312,7 +166,7 @@ select:disabled {
   overflow: auto !important;
 }
 
-/* 4) ✅ إزاحة المودال قليلًا لليسار حتى يتوسّط الشاشة بالكامل */
+/* 4) إزاحة اختيارية */
 .products-page .fixed.inset-0.z-50 .bg-white,
 .clients-page  .fixed.inset-0.z-50 .bg-white,
 .expenses-page .fixed.inset-0.z-50 .bg-white,
@@ -321,10 +175,9 @@ select:disabled {
 }
 
 /* =========================================================
-   ✅ FIX نهائي لظهور الكتابة في صفحة Login الموظفين:
-   بعض الثيمات تفرض -webkit-text-fill-color أو لون أبيض بـ !important
-   لذلك نثبت اللون الأسود على كلاس محدد وعلى كل inputs أيضًا.
+   Login input black text hardening (legacy)
    ========================================================= */
+
 .force-black-input{
   color: #111 !important;
   caret-color: #111 !important;
@@ -336,10 +189,6 @@ select:disabled {
   -webkit-text-fill-color: rgba(0,0,0,0.55) !important;
 }
 
-/* زيادة حماية عامة لكل الحقول */
-input, textarea, select{
-  -webkit-text-fill-color: #111 !important;
-}
-input::placeholder, textarea::placeholder{
-  -webkit-text-fill-color: rgba(0,0,0,0.55) !important;
-}
+/* حماية عامة للـ webkit fill */
+input, textarea, select{ -webkit-text-fill-color: var(--text); }
+input::placeholder, textarea::placeholder{ -webkit-text-fill-color: rgba(100, 116, 139, 0.85); }
