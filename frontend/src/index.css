@@ -9,11 +9,28 @@
   100% { background-position: 0% 50%; }
 }
 
-/* ===== حركة اللمعان الذهبي البطيء (Breathing Glow) ===== */
+/* ===== متغيرات الثيم (Modern / Professional) ===== */
+:root{
+  /* Accent */
+  --accent-1: #F59E0B;   /* amber-500 */
+  --accent-2: #FBBF24;   /* amber-400 */
+  --accent-brd: #D97706; /* amber-600 */
+
+  /* Glass */
+  --glass-alpha: 0.18;
+  --glass-bg: rgba(0,0,0,var(--glass-alpha));
+  --glass-brd: rgba(255,255,255,0.10);
+  --glass-blur: 8px;
+
+  /* ✅ إزاحة المودال لليسار لتوسيطه على كامل الشاشة مع وجود Sidebar */
+  --modal-shift-x: -480px; /* كما هو */
+}
+
+/* ===== حركة اللمعان (Breathing Glow) ===== */
 @keyframes goldGlow {
-  0% { box-shadow: 0 0 8px 2px rgba(244,201,93,0.4), 0 0 20px rgba(212,175,55,0.2); }
-  50% { box-shadow: 0 0 16px 4px rgba(244,201,93,0.8), 0 0 35px rgba(212,175,55,0.35); }
-  100% { box-shadow: 0 0 8px 2px rgba(244,201,93,0.4), 0 0 20px rgba(212,175,55,0.2); }
+  0% { box-shadow: 0 0 8px 2px rgba(245,158,11,0.22), 0 0 22px rgba(251,191,36,0.10); }
+  50% { box-shadow: 0 0 16px 4px rgba(245,158,11,0.42), 0 0 34px rgba(251,191,36,0.18); }
+  100% { box-shadow: 0 0 8px 2px rgba(245,158,11,0.22), 0 0 22px rgba(251,191,36,0.10); }
 }
 
 /* ===== حركة مسار الضوء الذهبي عبر الشاشة ===== */
@@ -27,25 +44,25 @@ html, body, #root { height: 100%; background: transparent !important; }
 
 /* ===== طبقات الخلفية (تُستخدم في AppBackground.jsx) ===== */
 .bg-animated{
+  /* خلفية داكنة مودرن (Slate/Navy) مع لمسة Amber خفيفة */
   background: linear-gradient(-45deg,
-    #0A1931 0%,
-    #1E3A8A 18%,
-    #6B4A2B 38%,
-    #B08946 58%,
-    #D4AF37 78%,
-    #F4C95D 100%);
+    #0B1220 0%,
+    #0F172A 28%,
+    #111827 52%,
+    #0B1220 76%,
+    rgba(245,158,11,0.22) 100%);
   background-size: 300% 300%;
   animation: brandGradient 16s ease-in-out infinite;
-  filter: saturate(1.05);
+  filter: saturate(1.02);
 }
 
 /* شعاع ضوء ذهبي يتحرك قطريًا ببطء */
 .bg-light-sweep{
   background:
     radial-gradient(60% 40% at 0% 0%,
-      rgba(244,201,93,0.35) 0%,
-      rgba(244,201,93,0.12) 35%,
-      rgba(212,175,55,0.06) 55%,
+      rgba(251,191,36,0.22) 0%,
+      rgba(245,158,11,0.10) 35%,
+      rgba(245,158,11,0.06) 55%,
       rgba(0,0,0,0.0) 70%);
   background-repeat: no-repeat;
   background-size: 120% 120%;
@@ -64,15 +81,6 @@ html, body, #root { height: 100%; background: transparent !important; }
 }
 
 /* ===== الزجاج العام ===== */
-:root{
-  --glass-alpha: 0.20;
-  --glass-bg: rgba(0,0,0,var(--glass-alpha));
-  --glass-brd: rgba(255,255,255,0.10);
-  --glass-blur: 6px;
-
-  /* ✅ إزاحة المودال لليسار لتوسيطه على كامل الشاشة مع وجود Sidebar */
-  --modal-shift-x: -480px; /* تم التعديل من -360px إلى -480px */
-}
 
 aside, .sidebar, .sidebar-container, .app-sidebar, [data-role="sidebar"],
 header, .topbar, .app-header, [data-role="topbar"] {
@@ -121,13 +129,13 @@ table, thead, tbody, .table, .table-root, .table-container {
 
 /* ===== زر ذهبي موحّد ===== */
 .btn-gold, .button-gold, .btn-primary-gold {
-  background: linear-gradient(180deg, #F4C95D, #D4AF37);
+  background: linear-gradient(180deg, var(--accent-2), var(--accent-1));
   color: #111;
-  border: 1px solid #B08946;
+  border: 1px solid var(--accent-brd);
   border-radius: 12px;
   padding: 8px 14px;
   font-weight: 600;
-  box-shadow: 0 0 10px rgba(212,175,55,.4);
+  box-shadow: 0 0 10px rgba(245,158,11,.22);
   transition: all 0.3s ease-in-out;
 }
 .btn-gold:hover,
@@ -159,9 +167,9 @@ button:hover {
 .whatsapp-page .box,
 .whatsapp-page .content-card { background: rgba(0,0,0,0.36) !important; }
 .whatsapp-page .btn, .whatsapp-page button {
-  background: linear-gradient(180deg, #F4C95D, #D4AF37) !important;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent-1)) !important;
   color: #111 !important;
-  border: 1px solid #B08946 !important;
+  border: 1px solid var(--accent-brd) !important;
   animation: goldGlow 2.5s infinite ease-in-out;
 }
 
@@ -179,9 +187,9 @@ button:hover {
 .expenses-page .btn, .expenses-page button,
 .clients-page  .btn, .clients-page  button,
 .sales-page    .btn, .sales-page    button {
-  background: linear-gradient(180deg, #F4C95D, #D4AF37) !important;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent-1)) !important;
   color: #111 !important;
-  border: 1px solid #B08946 !important;
+  border: 1px solid var(--accent-brd) !important;
   animation: goldGlow 2.5s infinite ease-in-out;
 }
 
@@ -203,7 +211,7 @@ select {
   color: #111 !important;
   caret-color: #111 !important;
   background: rgba(255,255,255,0.95) !important;
-  border: 1px solid #B08946 !important;
+  border: 1px solid var(--accent-brd) !important;
   border-radius: 8px;
   transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
@@ -226,7 +234,7 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none !important;
-  border-color: #F4C95D !important;
+  border-color: var(--accent-2) !important;
   background: rgba(255,255,255,0.98) !important;
   animation: goldGlow 2.5s infinite ease-in-out;
 }

@@ -5,9 +5,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        gold: '#D4AF37',
-        cocoa: '#5A4632',
-        ink: '#111111',
+        /* legacy names kept for compatibility */
+        gold: '#F59E0B',
+        cocoa: '#0F172A',
+        ink: '#0B1220',
         base: '#FAFAFA',
         card: '#FFFFFF',
         line: '#EAE7E1',

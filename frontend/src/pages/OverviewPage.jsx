@@ -140,9 +140,9 @@ export default function OverviewPage() {
                 <Tooltip contentStyle={{ background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff' }}
                          labelStyle={{ color:'#fff' }} />
                 <Legend wrapperStyle={{ color:'#fff' }} />
-                <Line type="monotone" dataKey="sales"    name="Sales"      stroke="#F4C95D" strokeWidth={3} dot={false}/>
-                <Line type="monotone" dataKey="expenses" name="Expenses"   stroke="#B08946" strokeWidth={3} dot={false}/>
-                <Line type="monotone" dataKey="net"      name="Net Profit" stroke="#FFFFFF" strokeWidth={3} dot={false}/>
+                <Line type="monotone" dataKey="sales"    name="Sales"      stroke="#F59E0B" strokeWidth={3} dot={false}/>
+                <Line type="monotone" dataKey="expenses" name="Expenses"   stroke="#EF4444" strokeWidth={3} dot={false}/>
+                <Line type="monotone" dataKey="net"      name="Net Profit" stroke="#22C55E" strokeWidth={3} dot={false}/>
               </LineChart>
             ) : (
               <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
@@ -152,9 +152,9 @@ export default function OverviewPage() {
                 <Tooltip contentStyle={{ background:'rgba(0,0,0,0.7)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff' }}
                          labelStyle={{ color:'#fff' }} />
                 <Legend wrapperStyle={{ color:'#fff' }} />
-                <Area type="monotone" dataKey="sales"    name="Sales"      stroke="#F4C95D" fill="rgba(244,201,93,.25)"  strokeWidth={3}/>
-                <Area type="monotone" dataKey="expenses" name="Expenses"   stroke="#B08946" fill="rgba(176,137,70,.22)" strokeWidth={3}/>
-                <Area type="monotone" dataKey="net"      name="Net Profit" stroke="#FFFFFF" fill="rgba(255,255,255,.18)" strokeWidth={3}/>
+                <Area type="monotone" dataKey="sales"    name="Sales"      stroke="#F59E0B" fill="rgba(245,158,11,.22)"  strokeWidth={3}/>
+                <Area type="monotone" dataKey="expenses" name="Expenses"   stroke="#EF4444" fill="rgba(239,68,68,.18)" strokeWidth={3}/>
+                <Area type="monotone" dataKey="net"      name="Net Profit" stroke="#22C55E" fill="rgba(34,197,94,.18)" strokeWidth={3}/>
               </AreaChart>
             )}
           </ResponsiveContainer>
