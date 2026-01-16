@@ -1,26 +1,38 @@
-export default function Table({ columns, data, keyField = 'id' }) {
+import React from "react";
+
+export default function Table({
+  columns = [],
+  data = [],
+  keyField = "id",
+  emptyText = "No data",
+  className = "",
+}) {
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
-        <thead className="text-left text-mute border-b border-line">
-          <tr>
-            {columns.map((c) => (
-              <th key={c.key} className="py-2 pr-6">{c.title}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, idx) => (
-            <tr key={row[keyField] ?? idx} className="border-b border-line">
+    <div className={`ui-card overflow-hidden ${className}`}>
+      <div className="overflow-x-auto">
+        <table className="ui-table">
+          <thead>
+            <tr>
               {columns.map((c) => (
-                <td key={c.key} className="py-2 pr-6">
-                  {c.render ? c.render(row) : row[c.key]}
-                </td>
+                <th key={c.key}>{c.title}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((row, idx) => (
+              <tr key={row[keyField] ?? idx}>
+                {columns.map((c) => (
+                  <td key={c.key}>{c.render ? c.render(row) : row[c.key]}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {!data?.length && (
+        <div className="p-6 text-center text-sm text-mute">{emptyText}</div>
+      )}
     </div>
-  )
+  );
 }

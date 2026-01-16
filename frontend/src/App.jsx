@@ -89,7 +89,7 @@ function AppBackground({ children }) {
 function PageWrapper({ children }) {
   return (
     <motion.div
-      className="p-5 md:p-8"
+      className=""
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
@@ -97,15 +97,6 @@ function PageWrapper({ children }) {
     >
       {children}
     </motion.div>
-  )
-}
-function WrapSurface({ children, className = '' }) {
-  return (
-    <div
-      className={`max-w-6xl mx-auto bg-white border border-line shadow-soft rounded-3xl p-4 md:p-6 ${className}`}
-    >
-      {children}
-    </div>
   )
 }
 
@@ -651,9 +642,9 @@ function RoutedPages() {
           element={
             <ProtectedRoute>
               <PageWrapper>
-                <WrapSurface className="cash-page">
+                <div className="cash-page space-y-6">
                   <CashPage />
-                </WrapSurface>
+                </div>
               </PageWrapper>
             </ProtectedRoute>
           }
@@ -665,9 +656,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface className="overview-page">
+                  <div className="overview-page space-y-6">
                     <OverviewPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -680,9 +671,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface className="summery-page">
+                  <div className="summery-page space-y-6">
                     <SummeryPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -695,9 +686,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface>
+                  <div className="space-y-6">
                     <Dashboard />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -710,9 +701,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface>
+                  <div className="products-page space-y-6">
                     <ProductsPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -725,9 +716,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface>
+                  <div className="expenses-page space-y-6">
                     <ExpensesPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -740,9 +731,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface>
+                  <div className="space-y-6">
                     <POSPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -755,9 +746,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface>
+                  <div className="clients-page space-y-6">
                     <ClientsPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -770,9 +761,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface>
+                  <div className="sales-page space-y-6">
                     <SalesPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -785,9 +776,9 @@ function RoutedPages() {
             <ProtectedRoute>
               <DayOpenedRoute>
                 <PageWrapper>
-                  <WrapSurface>
+                  <div className="space-y-6">
                     <WhatsAppPage />
-                  </WrapSurface>
+                  </div>
                 </PageWrapper>
               </DayOpenedRoute>
             </ProtectedRoute>
@@ -814,7 +805,7 @@ function AppShell() {
         {isLogin ? (
           <RoutedPages />
         ) : (
-          <Layout className="motion-ready">
+          <Layout>
             <RoutedPages />
           </Layout>
         )}

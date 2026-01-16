@@ -1,9 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
+import Card from "../components/Card";
+import Table from "../components/Table";
 
-const API_ORIG = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
-const API_BASE = API_ORIG.replace(/\/api$/, "");
-const url = (p) => `${API_BASE}${p.startsWith("/") ? p : `/${p}`}`;
+const API_ORIG = import.meta.env.VITE_API_URL || "";
+const API_BASE = (() => {
+  let s = String(API_ORIG || "");
+  while (s.endsWith("/")) s = s.slice(0, -1);
+  if (s.endsWith("/api")) s = s.slice(0, -4);
+  return s;
+})();
+const url = (p) => {
+  const path = p.startsWith("/") ? p : `/${p}`;
+  return `${API_BASE}${path}`;
+};
 
 const K = (n) =>
   `KSh ${Number(n || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`;
@@ -19,15 +29,12 @@ const endOfDay = (d) => {
   return x;
 };
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
-
 const fmtD = (d) => new Date(d).toISOString().slice(0, 10);
 const fmtT = (d) =>
   new Date(d).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" });
 
 const normPM = (r) =>
-  String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "")
-    .trim()
-    .toLowerCase();
+  String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
 
 function lsKey(prefix, day) {
   return `zaad_${prefix}_${day}`;
@@ -35,7 +42,6 @@ function lsKey(prefix, day) {
 
 function readDayOpen() {
   try {
-    // App.jsx stores Start-Day info under "dayOpen"
     return JSON.parse(localStorage.getItem("dayOpen") || "null");
   } catch {
     return null;
@@ -50,12 +56,11 @@ export default function SummeryPage() {
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
-  // === Cashier controls (single day)
+  // Cashier controls (single day)
   const [openingCash, setOpeningCash] = useState(0);
   const [openingTill, setOpeningTill] = useState(0);
 
   // Manual withdrawals with details (single day)
-  // {id, time, source: 'cash'|'till', amount, note}
   const [withdrawals, setWithdrawals] = useState([]);
   const [wSource, setWSource] = useState("cash");
   const [wAmount, setWAmount] = useState(0);
@@ -90,20 +95,16 @@ export default function SummeryPage() {
   useEffect(() => {
     if (!isSingleDay) return;
 
-    // Prefer values from Start Day (dayOpen) if it matches the selected day
     const dayOpen = readDayOpen();
     const dayOpenMatches = dayOpen?.date === dayKey;
 
-    const oc =
-      dayOpenMatches
-        ? Number(dayOpen?.openingCashTotal || 0)
-        : Number(localStorage.getItem(lsKey("opening_cash", dayKey)) || 0);
+    const oc = dayOpenMatches
+      ? Number(dayOpen?.openingCashTotal || 0)
+      : Number(localStorage.getItem(lsKey("opening_cash", dayKey)) || 0);
 
-    // openingTillTotal is added in updated App; fallback to mpesaWithdrawal if older data exists
-    const ot =
-      dayOpenMatches
-        ? Number(dayOpen?.openingTillTotal ?? dayOpen?.mpesaWithdrawal ?? 0)
-        : Number(localStorage.getItem(lsKey("opening_till", dayKey)) || 0);
+    const ot = dayOpenMatches
+      ? Number(dayOpen?.openingTillTotal ?? dayOpen?.mpesaWithdrawal ?? 0)
+      : Number(localStorage.getItem(lsKey("opening_till", dayKey)) || 0);
 
     setOpeningCash(oc);
     setOpeningTill(ot);
@@ -122,18 +123,16 @@ export default function SummeryPage() {
     if (!isSingleDay) return;
     localStorage.setItem(lsKey("opening_cash", dayKey), String(Number(openingCash || 0)));
   }, [openingCash, isSingleDay, dayKey]);
-
   useEffect(() => {
     if (!isSingleDay) return;
     localStorage.setItem(lsKey("opening_till", dayKey), String(Number(openingTill || 0)));
   }, [openingTill, isSingleDay, dayKey]);
-
   useEffect(() => {
     if (!isSingleDay) return;
     localStorage.setItem(lsKey("withdrawals", dayKey), JSON.stringify(withdrawals || []));
   }, [withdrawals, isSingleDay, dayKey]);
 
-  // Filter helpers
+  // Range filters
   const inRange = (t) => {
     const d = new Date(t);
     return d >= dFrom && d <= dTo;
@@ -142,37 +141,24 @@ export default function SummeryPage() {
   const salesInRange = useMemo(() => sales.filter((s) => inRange(s.createdAt)), [sales, dFrom, dTo]);
   const expensesInRange = useMemo(() => expenses.filter((e) => inRange(e.date)), [expenses, dFrom, dTo]);
 
-  // Sales totals by payment method
+  // Totals
   const totals = useMemo(() => {
     const totalSales = salesInRange.reduce((sum, r) => sum + Number(r.total || 0), 0);
-
-    const cashSales = salesInRange.reduce(
-      (sum, r) => (normPM(r) === "cash" ? sum + Number(r.total || 0) : sum),
-      0
-    );
-    const tillSales = salesInRange.reduce(
-      (sum, r) => (normPM(r) === "till" ? sum + Number(r.total || 0) : sum),
-      0
-    );
+    const cashSales = salesInRange.reduce((sum, r) => (normPM(r) === "cash" ? sum + Number(r.total || 0) : sum), 0);
+    const tillSales = salesInRange.reduce((sum, r) => (normPM(r) === "till" ? sum + Number(r.total || 0) : sum), 0);
     const withdrawalSales = salesInRange.reduce(
       (sum, r) => (normPM(r) === "withdrawal" ? sum + Number(r.total || 0) : sum),
       0
     );
-
     const totalExpenses = expensesInRange.reduce((sum, r) => sum + Number(r.amount || 0), 0);
     const netProfit = totalSales - totalExpenses;
-
     return { totalSales, totalExpenses, netProfit, cashSales, tillSales, withdrawalSales };
   }, [salesInRange, expensesInRange]);
 
   // Manual withdrawals breakdown (single day)
   const withdrawalManual = useMemo(() => {
-    const cash = withdrawals
-      .filter((w) => w.source === "cash")
-      .reduce((s, w) => s + Number(w.amount || 0), 0);
-    const till = withdrawals
-      .filter((w) => w.source === "till")
-      .reduce((s, w) => s + Number(w.amount || 0), 0);
+    const cash = withdrawals.filter((w) => w.source === "cash").reduce((s, w) => s + Number(w.amount || 0), 0);
+    const till = withdrawals.filter((w) => w.source === "till").reduce((s, w) => s + Number(w.amount || 0), 0);
     return { cash, till, total: cash + till };
   }, [withdrawals]);
 
@@ -189,7 +175,6 @@ export default function SummeryPage() {
 
   function addWithdrawal() {
     if (!isSingleDay) return;
-
     const amt = Number(wAmount || 0);
     if (!Number.isFinite(amt) || amt <= 0) {
       alert("Please enter a valid withdrawal amount.");
@@ -198,7 +183,7 @@ export default function SummeryPage() {
     const row = {
       id: `${Date.now()}`,
       time: new Date().toISOString(),
-      source: wSource, // cash | till
+      source: wSource,
       amount: amt,
       note: String(wNote || "").trim(),
     };
@@ -211,301 +196,209 @@ export default function SummeryPage() {
     setWithdrawals((prev) => prev.filter((x) => x.id !== id));
   }
 
+  const withdrawalColumns = [
+    {
+      key: "time",
+      title: "Time",
+      render: (r) => (
+        <div>
+          <div className="font-semibold text-ink">{fmtT(r.time)}</div>
+          <div className="text-xs text-mute">{fmtD(r.time)}</div>
+        </div>
+      ),
+    },
+    {
+      key: "source",
+      title: "Source",
+      render: (r) => (
+        <span className={r.source === "cash" ? "ui-badge-gold" : "ui-badge-green"}>
+          {r.source}
+        </span>
+      ),
+    },
+    { key: "amount", title: "Amount", render: (r) => <b>{K(r.amount)}</b> },
+    { key: "note", title: "Note", render: (r) => <span className="text-mute">{r.note || "—"}</span> },
+    {
+      key: "actions",
+      title: "",
+      render: (r) => (
+        <button className="ui-btn ui-btn-ghost" onClick={() => removeWithdrawal(r.id)}>
+          Remove
+        </button>
+      ),
+    },
+  ];
+
+  const posWithdrawalColumns = [
+    { key: "invoiceNo", title: "Invoice", render: (r) => <b>{r.invoiceNo || "—"}</b> },
+    { key: "createdAt", title: "Time", render: (r) => <span className="text-mute">{fmtT(r.createdAt)}</span> },
+    { key: "total", title: "Total", render: (r) => <b>{K(r.total)}</b> },
+    { key: "clientName", title: "Client", render: (r) => <span className="text-mute">{r.clientName || "—"}</span> },
+  ];
+
   return (
-    <div className="summery-page">
-      {/* Date range */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <label className="text-mute">From</label>
-        <input
-          type="date"
-          className="rounded-xl border border-line bg-white px-3 py-2 text-ink"
-          value={fromDate}
-          max={toDate}
-          onChange={(e) => setFromDate(e.target.value)}
-        />
-        <label className="text-mute">To</label>
-        <input
-          type="date"
-          className="rounded-xl border border-line bg-white px-3 py-2 text-ink"
-          value={toDate}
-          min={fromDate}
-          onChange={(e) => setToDate(e.target.value)}
-        />
-        {!isSingleDay && (
-          <div className="text-sm text-mute">
-            Cashier section works when From = To (single day).
+    <div className="space-y-6">
+      {/* Header + date range */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="ui-h1">Summary</div>
+          <div className="ui-sub mt-1">Cashier + totals + withdrawals with details</div>
+        </div>
+
+        <div className="ui-card p-3 md:p-4 flex flex-wrap items-center gap-3">
+          <div className="text-xs font-bold uppercase tracking-wider text-mute">Range</div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              className="ui-input !w-auto"
+              value={fromDate}
+              max={toDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+            <span className="text-mute">→</span>
+            <input
+              type="date"
+              className="ui-input !w-auto"
+              value={toDate}
+              min={fromDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
           </div>
-        )}
-      </div>
 
-      {/* High-level summary cards */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-4 mb-6">
-        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
-          <div className="text-mute mb-1">Total Sales</div>
-          <div className="text-3xl font-semibold">{K(totals.totalSales)}</div>
-        </div>
-        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
-          <div className="text-mute mb-1">Cash Sales</div>
-          <div className="text-3xl font-semibold">{K(totals.cashSales)}</div>
-        </div>
-        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
-          <div className="text-mute mb-1">Till Sales</div>
-          <div className="text-3xl font-semibold">{K(totals.tillSales)}</div>
-        </div>
-        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
-          <div className="text-mute mb-1">Withdrawal (POS)</div>
-          <div className="text-3xl font-semibold">{K(totals.withdrawalSales)}</div>
-          <div className="text-xs text-mute mt-1">
-            Sum of records where paymentMethod = withdrawal
-          </div>
+          {!isSingleDay && (
+            <span className="ui-badge">Cashier section works when From = To</span>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 mb-6">
-        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
-          <div className="text-mute mb-1">Expenses</div>
-          <div className="text-3xl font-semibold">{K(totals.totalExpenses)}</div>
-        </div>
-        <div className="rounded-2xl p-4 bg-white border border-line shadow-soft">
-          <div className="text-mute mb-1">Net Profit</div>
-          <div className="text-3xl font-semibold">{K(totals.netProfit)}</div>
-        </div>
+      {/* KPI */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+        <Card title="Total Sales" value={K(totals.totalSales)} subtitle="All payments" />
+        <Card title="Total Expenses" value={K(totals.totalExpenses)} subtitle="Operational costs" />
+        <Card title="Net Profit" value={K(totals.netProfit)} subtitle="Sales minus expenses" />
       </div>
 
-      {/* Cashier accounting */}
-      <Section title="Cashier Accounting — Opening + Sales − Withdrawals">
+      <Section title="Sales by Payment Method" subtitle="Cash / Till / Withdrawal (POS)">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+          <Card title="Cash Sales" value={K(totals.cashSales)} />
+          <Card title="Till Sales" value={K(totals.tillSales)} />
+          <Card title="Withdrawal (POS)" value={K(totals.withdrawalSales)} />
+        </div>
+      </Section>
+
+      {/* Cashier section */}
+      <Section
+        title="Cashier"
+        subtitle={isSingleDay ? `Day: ${dayKey}` : "Select a single day to enable cashier calculations"}
+      >
         {!isSingleDay ? (
-          <div className="text-mute">
-            Select a single day to manage opening balances and withdrawal details.
+          <div className="ui-card p-4 text-sm text-mute">
+            To manage cashier totals (opening cash, opening till, withdrawals), set <b>From = To</b>.
           </div>
         ) : (
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          <div className="space-y-6">
             {/* Opening */}
-            <div className="rounded-2xl border border-line bg-base p-4">
-              <div className="text-ink font-semibold mb-3">Opening Amounts</div>
-
-              <label className="block mb-3">
-                <span className="block text-mute mb-1">Opening Cash</span>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+              <div className="ui-card p-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-mute">Opening Cash</div>
                 <input
                   type="number"
                   min="0"
-                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
+                  className="ui-input mt-2"
                   value={openingCash}
-                  onChange={(e) => setOpeningCash(+e.target.value || 0)}
+                  onChange={(e) => setOpeningCash(Number(e.target.value || 0))}
                 />
-              </label>
-
-              <label className="block">
-                <span className="block text-mute mb-1">Opening Till</span>
+                <div className="ui-sub mt-2">Stored locally for this day</div>
+              </div>
+              <div className="ui-card p-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-mute">Opening Till</div>
                 <input
                   type="number"
                   min="0"
-                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
+                  className="ui-input mt-2"
                   value={openingTill}
-                  onChange={(e) => setOpeningTill(+e.target.value || 0)}
+                  onChange={(e) => setOpeningTill(Number(e.target.value || 0))}
                 />
-              </label>
-
-              <div className="text-xs text-mute mt-3">
-                For {dayKey}: values are auto-saved (local storage).
+                <div className="ui-sub mt-2">Stored locally for this day</div>
               </div>
             </div>
 
-            {/* Add Withdrawal */}
-            <div className="rounded-2xl border border-line bg-base p-4">
-              <div className="text-ink font-semibold mb-3">Record Withdrawal (Details)</div>
-
-              <label className="block mb-3">
-                <span className="block text-mute mb-1">From</span>
-                <select
-                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
-                  value={wSource}
-                  onChange={(e) => setWSource(e.target.value)}
-                >
-                  <option value="cash">Cash</option>
-                  <option value="till">Till</option>
-                </select>
-              </label>
-
-              <label className="block mb-3">
-                <span className="block text-mute mb-1">Amount</span>
-                <input
-                  type="number"
-                  min="0"
-                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
-                  value={wAmount}
-                  onChange={(e) => setWAmount(+e.target.value || 0)}
+            {/* Expected balances */}
+            {cashierBalances && (
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+                <Card
+                  title="Expected Cash"
+                  value={K(cashierBalances.cash)}
+                  subtitle={`Opening + Cash Sales - Withdrawals (${K(withdrawalManual.cash)})`}
                 />
-              </label>
-
-              <label className="block mb-3">
-                <span className="block text-mute mb-1">Note (optional)</span>
-                <input
-                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-ink"
-                  value={wNote}
-                  onChange={(e) => setWNote(e.target.value)}
-                  placeholder="Reason / reference..."
+                <Card
+                  title="Expected Till"
+                  value={K(cashierBalances.till)}
+                  subtitle={`Opening + Till Sales - Withdrawals (${K(withdrawalManual.till)})`}
                 />
-              </label>
+                <Card title="Grand Total" value={K(cashierBalances.grand)} subtitle="Cash + Till" />
+              </div>
+            )}
 
-              <button className="btn-gold w-full" onClick={addWithdrawal}>
-                Add Withdrawal
-              </button>
+            {/* Withdrawals add */}
+            <div className="ui-card p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <div className="ui-h2">Manual Withdrawals</div>
+                  <div className="ui-sub mt-1">Record withdrawals with details</div>
+                </div>
 
-              <div className="mt-4 text-sm text-ink">
-                <div className="flex justify-between">
-                  <span>Withdrawals (Cash)</span>
-                  <b>{K(withdrawalManual.cash)}</b>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="block">
+                    <span className="ui-label">Source</span>
+                    <select className="ui-select mt-1 !w-auto" value={wSource} onChange={(e) => setWSource(e.target.value)}>
+                      <option value="cash">cash</option>
+                      <option value="till">till</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="ui-label">Amount</span>
+                    <input
+                      type="number"
+                      min="0"
+                      className="ui-input mt-1 !w-[160px]"
+                      value={wAmount}
+                      onChange={(e) => setWAmount(Number(e.target.value || 0))}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="ui-label">Note</span>
+                    <input
+                      type="text"
+                      className="ui-input mt-1 !w-[220px]"
+                      value={wNote}
+                      onChange={(e) => setWNote(e.target.value)}
+                      placeholder="e.g. supplier payment"
+                    />
+                  </label>
+                  <button className="ui-btn ui-btn-primary" onClick={addWithdrawal}>
+                    Add
+                  </button>
                 </div>
-                <div className="flex justify-between">
-                  <span>Withdrawals (Till)</span>
-                  <b>{K(withdrawalManual.till)}</b>
-                </div>
-                <div className="flex justify-between border-t border-line pt-2 mt-2">
-                  <span>Total Withdrawals</span>
-                  <b>{K(withdrawalManual.total)}</b>
-                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-3">
+                <Card title="Withdrawals (Cash)" value={K(withdrawalManual.cash)} />
+                <Card title="Withdrawals (Till)" value={K(withdrawalManual.till)} />
+                <Card title="Withdrawals (Total)" value={K(withdrawalManual.total)} />
+              </div>
+
+              <div className="mt-4">
+                <Table columns={withdrawalColumns} data={withdrawals} keyField="id" emptyText="No withdrawals" />
               </div>
             </div>
 
-            {/* Balances */}
-            <div className="rounded-2xl border border-line bg-base p-4">
-              <div className="text-ink font-semibold mb-3">Expected Cashier Balance</div>
-
-              <div className="flex justify-between items-center rounded-xl bg-white border border-line p-3 mb-3">
-                <span className="text-mute">Cash in Drawer</span>
-                <b className="text-xl">{K(cashierBalances?.cash || 0)}</b>
-              </div>
-
-              <div className="flex justify-between items-center rounded-xl bg-white border border-line p-3 mb-3">
-                <span className="text-mute">Till Balance</span>
-                <b className="text-xl">{K(cashierBalances?.till || 0)}</b>
-              </div>
-
-              <div className="flex justify-between items-center border-t border-line pt-3">
-                <span className="text-mute">Total on Hand</span>
-                <b className="text-2xl">{K(cashierBalances?.grand || 0)}</b>
-              </div>
-
-              <div className="text-xs text-mute mt-2">
-                Calculation:
-                Cash = Opening Cash + Cash Sales − Cash Withdrawals
-                / Till = Opening Till + Till Sales − Till Withdrawals
-              </div>
-            </div>
+            {/* POS withdrawals list */}
+            <Section title="POS Withdrawals" subtitle="Sales recorded with paymentMethod = withdrawal">
+              <Table columns={posWithdrawalColumns} data={posWithdrawals} keyField="invoiceNo" emptyText="No POS withdrawals" />
+            </Section>
           </div>
         )}
-      </Section>
-
-      {/* Manual Withdrawal Details */}
-      <Section title="Withdrawals (Manual) — Details">
-        {!isSingleDay ? (
-          <div className="text-mute">
-            Select a single day to view/manage manual withdrawals.
-          </div>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-mute border-b border-line">
-                  <th className="py-2 pr-3">Time</th>
-                  <th className="py-2 pr-3">Source</th>
-                  <th className="py-2 pr-3">Amount</th>
-                  <th className="py-2 pr-3">Note</th>
-                  <th className="py-2 pr-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {withdrawals.map((w) => (
-                  <tr key={w.id} className="border-b border-line text-ink">
-                    <td className="py-2 pr-3">{fmtT(w.time)}</td>
-                    <td className="py-2 pr-3">{w.source === "cash" ? "Cash" : "Till"}</td>
-                    <td className="py-2 pr-3">{K(w.amount)}</td>
-                    <td className="py-2 pr-3">{w.note || "—"}</td>
-                    <td className="py-2 pr-3">
-                      <button className="btn" onClick={() => removeWithdrawal(w.id)}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!withdrawals.length && (
-                  <tr>
-                    <td colSpan={5} className="py-3 text-mute">
-                      No manual withdrawals recorded for this day.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
-
-      {/* POS Withdrawal records */}
-      <Section title="Withdrawals (POS) — Details">
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-mute border-b border-line">
-                <th className="py-2 pr-3">Date</th>
-                <th className="py-2 pr-3">Time</th>
-                <th className="py-2 pr-3">Total</th>
-                <th className="py-2 pr-3">Invoice</th>
-                <th className="py-2 pr-3">Client</th>
-              </tr>
-            </thead>
-            <tbody>
-              {posWithdrawals.map((r, idx) => (
-                <tr key={r.id || r.invoiceNo || idx} className="border-b border-line text-ink">
-                  <td className="py-2 pr-3">{fmtD(r.createdAt)}</td>
-                  <td className="py-2 pr-3">{fmtT(r.createdAt)}</td>
-                  <td className="py-2 pr-3">{K(r.total)}</td>
-                  <td className="py-2 pr-3">{r.invoiceNo || "—"}</td>
-                  <td className="py-2 pr-3">{r.clientName || "—"}</td>
-                </tr>
-              ))}
-              {!posWithdrawals.length && (
-                <tr>
-                  <td colSpan={5} className="py-3 text-mute">
-                    No POS withdrawals in selected range.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Section>
-
-      {/* Expenses details */}
-      <Section title="Expenses — Details">
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-mute border-b border-line">
-                <th className="py-2 pr-3">Date</th>
-                <th className="py-2 pr-3">Title/Category</th>
-                <th className="py-2 pr-3">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expensesInRange.map((e, idx) => (
-                <tr key={idx} className="border-b border-line text-ink">
-                  <td className="py-2 pr-3">{fmtD(e.date)}</td>
-                  <td className="py-2 pr-3">{e.title || e.category || e.note || "—"}</td>
-                  <td className="py-2 pr-3">{K(e.amount)}</td>
-                </tr>
-              ))}
-              {!expensesInRange.length && (
-                <tr>
-                  <td colSpan={3} className="py-3 text-mute">
-                    No expenses in selected range.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       </Section>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
@@ -8,19 +8,17 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // ✅ مرونة في عنوان الـ API:
-  // - لو عندك VITE_API_URL في Render/Env للـ Frontend استخدمه
-  //   (سواء كتبت الدومين فقط أو الدومين + /api)
-  // - وإلا استخدم /api (في حالة نفس الدومين مع Proxy/Rewrite)
-  const API_ORIG = (import.meta?.env?.VITE_API_URL || "").replace(/\/+$/, "");
-  const API_HOST = API_ORIG.replace(/\/api$/, "");
-  const API_URL = API_HOST ? `${API_HOST}/api` : "/api";
+  // مرونة في عنوان الـ API
+  const API_URL = useMemo(() => {
+    const orig = (import.meta?.env?.VITE_API_URL || "").replace(/\/+$/, "");
+    const host = orig.replace(/\/api$/, "");
+    return host ? `${host}/api` : "/api";
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
     setLoading(true);
-
     try {
       const r = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
@@ -39,64 +37,131 @@ export default function Login() {
       localStorage.setItem("employee", JSON.stringify(data.employee || {}));
       nav("/overview");
     } catch (e2) {
-      setErr(e2.message);
+      setErr(e2.message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ ستايل إجباري على مستوى العنصر نفسه
-  // مهم لأن بعض الثيمات تستخدم -webkit-text-fill-color مع !important
-  const forceBlackInputStyle = {
-    color: "#111",
-    caretColor: "#111",
-    WebkitTextFillColor: "#111",
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-lg text-[#111]">
-        <h1 className="text-xl font-bold mb-2">تسجيل دخول الموظفين</h1>
-        <p className="text-sm text-[#555] mb-6">قم بتسجيل الدخول لبدء اليوم</p>
-
-        <form onSubmit={submit} className="space-y-4">
+    <div
+      className="min-h-screen flex items-stretch"
+      style={{
+        backgroundImage:
+          "radial-gradient(900px 360px at 12% 0%, rgba(197,122,42,0.20), transparent 60%), radial-gradient(900px 360px at 92% 10%, rgba(31,157,138,0.14), transparent 55%)",
+      }}
+    >
+      {/* Left brand panel */}
+      <div className="hidden lg:flex w-[46%] p-10">
+        <div className="ui-panel w-full flex flex-col justify-between">
           <div>
-            <label className="block text-sm font-semibold mb-1">اسم المستخدم</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="مثال: ahmed"
-              autoComplete="username"
-              style={forceBlackInputStyle}
-              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gold/40"
-            />
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-3xl bg-white border border-line shadow-soft flex items-center justify-center overflow-hidden">
+                <img
+                  src="/logo.png?v=5"
+                  alt="Zaad Bakery"
+                  className="h-12 w-12 object-contain"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                  draggable="false"
+                />
+              </div>
+              <div>
+                <div className="text-2xl font-extrabold tracking-tight text-ink">Zaad Bakery</div>
+                <div className="text-sm text-mute">POS • Inventory • Reporting</div>
+              </div>
+            </div>
+
+            <div className="mt-10">
+              <div className="ui-h1">Welcome back</div>
+              <div className="ui-sub mt-2 max-w-md">
+                تسجيل دخول الموظفين — واجهة أسرع، أوضح، ومناسبة للكاشير والـ Dashboard.
+              </div>
+
+              <div className="mt-8 grid grid-cols-2 gap-4 max-w-md">
+                <div className="ui-card p-4">
+                  <div className="text-xs font-bold text-mute uppercase tracking-wider">Focus</div>
+                  <div className="mt-2 font-semibold text-ink">Fast checkout</div>
+                  <div className="mt-1 text-sm text-mute">إتمام البيع خلال ثوانٍ</div>
+                </div>
+                <div className="ui-card p-4">
+                  <div className="text-xs font-bold text-mute uppercase tracking-wider">Clarity</div>
+                  <div className="mt-2 font-semibold text-ink">Clean reporting</div>
+                  <div className="mt-1 text-sm text-mute">ملخصات واضحة لليوم</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold mb-1">PIN</label>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="مثال: 1999"
-              autoComplete="current-password"
-              style={forceBlackInputStyle}
-              className="force-black-input w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gold/40"
-            />
+          <div className="text-xs text-mute">© {new Date().getFullYear()} Zaad Bakery</div>
+        </div>
+      </div>
+
+      {/* Right login card */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="ui-panel">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-base border border-line flex items-center justify-center overflow-hidden">
+                <img
+                  src="/logo.png?v=5"
+                  alt="Zaad Bakery"
+                  className="h-9 w-9 object-contain"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                  draggable="false"
+                />
+              </div>
+              <div>
+                <div className="ui-h2">Sign in</div>
+                <div className="ui-sub">تسجيل دخول الموظف لبدء العمل</div>
+              </div>
+            </div>
+
+            <form onSubmit={submit} className="mt-6 space-y-4">
+              <label className="block">
+                <span className="ui-label">Username</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="مثال: ahmed"
+                  autoComplete="username"
+                  className="ui-input mt-1"
+                />
+              </label>
+
+              <label className="block">
+                <span className="ui-label">PIN</span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder="مثال: 1999"
+                  autoComplete="current-password"
+                  className="ui-input mt-1"
+                />
+              </label>
+
+              {err && (
+                <div className="ui-card p-3 border border-[rgba(220,38,38,0.25)] bg-[rgba(220,38,38,0.06)]">
+                  <div className="text-sm font-semibold text-red-700">{err}</div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="ui-btn ui-btn-primary w-full"
+              >
+                {loading ? "جارٍ الدخول..." : "دخول"}
+              </button>
+            </form>
           </div>
 
-          {err && <div className="text-sm text-red-600">{err}</div>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gold hover:brightness-95 text-white font-semibold py-2 rounded-lg shadow disabled:opacity-60"
-          >
-            {loading ? "جارٍ الدخول..." : "دخول"}
-          </button>
-        </form>
+          <div className="text-center text-xs text-mute mt-4">
+            Tip: إذا كان اليوم لم يبدأ بعد، ستنتقل تلقائيًا إلى صفحة Cash.
+          </div>
+        </div>
       </div>
     </div>
   );

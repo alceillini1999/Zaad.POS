@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 /* =========================================================
-   Zaad Bakery – Theme 01 (Bakery Modern)
-   هدف الملف: واجهة فاتحة، نظيفة، واحترافية.
+   Zaad Bakery – Full Redesign (Bakery Modern)
+   الهدف: تغيير كامل للتصميم (Layout + Components + Typography)
+   مع الحفاظ على نفس المنطق والـ APIs.
    ========================================================= */
 
 :root {
@@ -31,61 +32,116 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection { background: rgba(197, 122, 42, 0.22); }
 
 /* =========================================================
-   Base surfaces
+   Design System Primitives
+   - نستخدم classes موحّدة بدل تكرار styles داخل الصفحات
    ========================================================= */
 
-.page-surface {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  padding: 20px;
+@layer components {
+  /* Surfaces */
+  .ui-card {
+    @apply bg-white border border-line rounded-3xl shadow-soft;
+  }
+  .ui-panel {
+    @apply ui-card p-5 md:p-6;
+  }
+  .ui-panel-tight {
+    @apply ui-card p-4;
+  }
+
+  /* Typography helpers */
+  .ui-h1 { @apply text-xl md:text-2xl font-extrabold tracking-tight text-ink; }
+  .ui-h2 { @apply text-lg md:text-xl font-bold tracking-tight text-ink; }
+  .ui-sub { @apply text-sm text-mute; }
+  .ui-label { @apply text-xs font-semibold text-mute; }
+
+  /* Inputs */
+  .ui-input {
+    @apply w-full rounded-2xl border border-line bg-white px-3 py-2 text-ink outline-none;
+    @apply focus:ring-4 focus:ring-[rgba(197,122,42,0.16)] focus:border-[rgba(197,122,42,0.55)];
+  }
+  .ui-select {
+    @apply ui-input pr-10;
+  }
+
+  /* Buttons */
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold;
+    @apply border border-line bg-white text-ink shadow-soft transition;
+    @apply hover:-translate-y-[1px] hover:bg-slate-50;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none;
+  }
+  .ui-btn-primary {
+    @apply ui-btn border-transparent;
+    background: linear-gradient(180deg, var(--primary-2), var(--primary));
+    color: #fff;
+    box-shadow: 0 14px 30px rgba(197, 122, 42, 0.22);
+  }
+  .ui-btn-primary:hover {
+    filter: brightness(0.98);
+    box-shadow: 0 16px 36px rgba(197, 122, 42, 0.26);
+  }
+  .ui-btn-ghost {
+    @apply ui-btn bg-transparent shadow-none;
+  }
+  .ui-btn-danger {
+    @apply ui-btn border-transparent text-white;
+    background: linear-gradient(180deg, rgba(220,38,38,0.95), rgba(185,28,28,0.95));
+  }
+
+  /* Badges */
+  .ui-badge {
+    @apply inline-flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-xs font-semibold text-ink/80;
+  }
+  .ui-badge-gold {
+    @apply ui-badge;
+    border-color: rgba(197,122,42,0.35);
+    background: rgba(197,122,42,0.08);
+    color: rgba(122,75,35,0.95);
+  }
+  .ui-badge-green {
+    @apply ui-badge;
+    border-color: rgba(22,163,74,0.35);
+    background: rgba(22,163,74,0.10);
+    color: rgba(22,163,74,0.95);
+  }
+  .ui-badge-red {
+    @apply ui-badge;
+    border-color: rgba(220,38,38,0.35);
+    background: rgba(220,38,38,0.08);
+    color: rgba(220,38,38,0.95);
+  }
+
+  /* Tables */
+  .ui-table {
+    @apply w-full text-sm;
+  }
+  .ui-table thead th {
+    @apply text-left text-xs font-bold text-mute uppercase tracking-wider py-3 px-3 border-b border-line;
+  }
+  .ui-table tbody td {
+    @apply py-3 px-3 border-b border-line;
+  }
+  .ui-table tbody tr {
+    @apply hover:bg-slate-50/60 transition;
+  }
 }
 
 /* Recharts: لا نضيف خلفية */
 .recharts-wrapper, .recharts-surface { background: transparent !important; }
 
 /* =========================================================
-   Buttons
+   Backward Compatibility
+   - بعض الصفحات القديمة تستخدم .btn / .btn-gold ... نخليها شغالة
    ========================================================= */
-
-.btn {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 8px 12px;
-  font-weight: 600;
-  transition: transform .15s ease, filter .15s ease, background-color .15s ease, border-color .15s ease;
-}
-.btn:hover { background: var(--surface-2); transform: translateY(-1px); }
-.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
-
-/* زر أساسي (Caramel) */
-.btn-gold, .button-gold, .btn-primary-gold {
-  background: linear-gradient(180deg, var(--primary-2), var(--primary));
-  color: #fff;
-  border: 1px solid rgba(181, 110, 36, 0.45);
-  border-radius: 12px;
-  padding: 8px 14px;
-  font-weight: 700;
-  box-shadow: 0 10px 22px rgba(197, 122, 42, 0.18);
-  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
-}
-.btn-gold:hover,
-.btn-gold:focus,
-.button-gold:hover,
-.button-gold:focus {
-  filter: brightness(0.98);
-  transform: translateY(-1px);
-  box-shadow: 0 12px 26px rgba(197, 122, 42, 0.22);
-  outline: none;
-}
+.btn { @apply ui-btn; }
+.btn-gold, .button-gold, .btn-primary-gold { @apply ui-btn-primary; }
 
 /* Focus ring عام */
 :focus-visible {
