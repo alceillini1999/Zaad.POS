@@ -8,7 +8,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // مرونة في عنوان الـ API
+  // Flexible API base
   const API_URL = useMemo(() => {
     const orig = (import.meta?.env?.VITE_API_URL || "").replace(/\/+$/, "");
     const host = orig.replace(/\/api$/, "");
@@ -19,6 +19,7 @@ export default function Login() {
     e.preventDefault();
     setErr("");
     setLoading(true);
+
     try {
       const r = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
@@ -45,122 +46,66 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-stretch"
+      className="min-h-screen flex items-center justify-center p-4"
       style={{
         backgroundImage:
           "radial-gradient(900px 360px at 12% 0%, rgba(197,122,42,0.20), transparent 60%), radial-gradient(900px 360px at 92% 10%, rgba(31,157,138,0.14), transparent 55%)",
       }}
     >
-      {/* Left brand panel */}
-      <div className="hidden lg:flex w-[46%] p-10">
-        <div className="ui-panel w-full flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-3xl bg-white border border-line shadow-soft flex items-center justify-center overflow-hidden">
-                <img
-                  src="/logo.png?v=5"
-                  alt="Zaad Bakery"
-                  className="h-12 w-12 object-contain"
-                  onError={(e) => (e.currentTarget.style.display = "none")}
-                  draggable="false"
-                />
-              </div>
-              <div>
-                <div className="text-2xl font-extrabold tracking-tight text-ink">Zaad Bakery</div>
-                <div className="text-sm text-mute">POS • Inventory • Reporting</div>
-              </div>
+      <div className="w-full max-w-md">
+        <div className="ui-panel">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-2xl bg-base border border-line flex items-center justify-center overflow-hidden">
+              <img
+                src="/logo.png?v=5"
+                alt="Zaad Bakery"
+                className="h-9 w-9 object-contain"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+                draggable="false"
+              />
             </div>
-
-            <div className="mt-10">
-              <div className="ui-h1">Welcome back</div>
-              <div className="ui-sub mt-2 max-w-md">
-                تسجيل دخول الموظفين — واجهة أسرع، أوضح، ومناسبة للكاشير والـ Dashboard.
-              </div>
-
-              <div className="mt-8 grid grid-cols-2 gap-4 max-w-md">
-                <div className="ui-card p-4">
-                  <div className="text-xs font-bold text-mute uppercase tracking-wider">Focus</div>
-                  <div className="mt-2 font-semibold text-ink">Fast checkout</div>
-                  <div className="mt-1 text-sm text-mute">إتمام البيع خلال ثوانٍ</div>
-                </div>
-                <div className="ui-card p-4">
-                  <div className="text-xs font-bold text-mute uppercase tracking-wider">Clarity</div>
-                  <div className="mt-2 font-semibold text-ink">Clean reporting</div>
-                  <div className="mt-1 text-sm text-mute">ملخصات واضحة لليوم</div>
-                </div>
-              </div>
+            <div>
+              <div className="ui-h2">Sign in</div>
+              <div className="ui-sub">Enter your username and PIN to continue.</div>
             </div>
           </div>
 
-          <div className="text-xs text-mute">© {new Date().getFullYear()} Zaad Bakery</div>
-        </div>
-      </div>
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <label className="block">
+              <span className="ui-label">Username</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. ahmed"
+                autoComplete="username"
+                className="ui-input mt-1"
+              />
+            </label>
 
-      {/* Right login card */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="ui-panel">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-2xl bg-base border border-line flex items-center justify-center overflow-hidden">
-                <img
-                  src="/logo.png?v=5"
-                  alt="Zaad Bakery"
-                  className="h-9 w-9 object-contain"
-                  onError={(e) => (e.currentTarget.style.display = "none")}
-                  draggable="false"
-                />
+            <label className="block">
+              <span className="ui-label">PIN</span>
+              <input
+                type="password"
+                inputMode="numeric"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="e.g. 1999"
+                autoComplete="current-password"
+                className="ui-input mt-1"
+              />
+            </label>
+
+            {err && (
+              <div className="ui-card p-3 border border-[rgba(220,38,38,0.25)] bg-[rgba(220,38,38,0.06)]">
+                <div className="text-sm font-semibold text-red-700">{err}</div>
               </div>
-              <div>
-                <div className="ui-h2">Sign in</div>
-                <div className="ui-sub">تسجيل دخول الموظف لبدء العمل</div>
-              </div>
-            </div>
+            )}
 
-            <form onSubmit={submit} className="mt-6 space-y-4">
-              <label className="block">
-                <span className="ui-label">Username</span>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="مثال: ahmed"
-                  autoComplete="username"
-                  className="ui-input mt-1"
-                />
-              </label>
-
-              <label className="block">
-                <span className="ui-label">PIN</span>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  placeholder="مثال: 1999"
-                  autoComplete="current-password"
-                  className="ui-input mt-1"
-                />
-              </label>
-
-              {err && (
-                <div className="ui-card p-3 border border-[rgba(220,38,38,0.25)] bg-[rgba(220,38,38,0.06)]">
-                  <div className="text-sm font-semibold text-red-700">{err}</div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="ui-btn ui-btn-primary w-full"
-              >
-                {loading ? "جارٍ الدخول..." : "دخول"}
-              </button>
-            </form>
-          </div>
-
-          <div className="text-center text-xs text-mute mt-4">
-            Tip: إذا كان اليوم لم يبدأ بعد، ستنتقل تلقائيًا إلى صفحة Cash.
-          </div>
+            <button type="submit" disabled={loading} className="ui-btn ui-btn-primary w-full">
+              {loading ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
         </div>
       </div>
     </div>

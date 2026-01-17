@@ -113,7 +113,8 @@ function DayOpenedRoute({ children }) {
 /* ======================
    Cash Denominations
 ====================== */
-const DENOMS = [1000, 500, 200, 100, 50, 20, 10, 5]
+// Include 1 KSh as requested
+const DENOMS = [1000, 500, 200, 100, 50, 20, 10, 5, 1]
 
 function buildInitialCounts() {
   const obj = {}
@@ -125,6 +126,17 @@ function parseNonNegInt(v) {
   if (v == null) return null
   const s = String(v).trim()
   if (!/^\d+$/.test(s)) return null
+  const n = Number(s)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
+}
+
+function parseNonNegNumber(v) {
+  if (v === '') return 0
+  if (v == null) return null
+  const s = String(v).replace(/,/g, '').trim()
+  if (s === '') return 0
+  if (!/^\d+(\.\d+)?$/.test(s)) return null
   const n = Number(s)
   if (!Number.isFinite(n) || n < 0) return null
   return n
@@ -149,8 +161,13 @@ function CashPage() {
 
   const [counts, setCounts] = useState(buildInitialCounts())
   const [tillNo, setTillNo] = useState(dayOpenState?.tillNo ? String(dayOpenState.tillNo) : '')
-  const [openingTillTotal, setOpeningTillTotal] = useState('0')
-  const [closingTillTotal, setClosingTillTotal] = useState('0')
+  // Payment methods (besides cash)
+  const [withdrawalCash, setWithdrawalCash] = useState(
+    dayOpenState?.withdrawalCash != null
+      ? String(dayOpenState.withdrawalCash)
+      : String(dayOpenState?.mpesaWithdrawal ?? 0)
+  )
+  const [sendMoney, setSendMoney] = useState(dayOpenState?.sendMoney != null ? String(dayOpenState.sendMoney) : '0')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
@@ -161,6 +178,13 @@ function CashPage() {
     setErr('')
     setOk('')
     if (isOpenedToday && dayOpenState?.tillNo) setTillNo(String(dayOpenState.tillNo))
+    if (isOpenedToday) {
+      setWithdrawalCash(String(dayOpenState?.withdrawalCash ?? dayOpenState?.mpesaWithdrawal ?? 0))
+      setSendMoney(String(dayOpenState?.sendMoney ?? 0))
+    } else {
+      setWithdrawalCash('0')
+      setSendMoney('0')
+    }
   }, [isOpenedToday]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalCash = useMemo(() => {
@@ -192,20 +216,24 @@ function CashPage() {
     setLoading(true)
 
     try {
-      if (totalCash === null) throw new Error('أدخل أرقام صحيحة في خانة العد.')
-      if (!tillNo.trim()) throw new Error('رقم الدرج (Till) مطلوب.')
+      if (totalCash === null) throw new Error('Please enter valid whole numbers for cash counts.')
+      if (!tillNo.trim()) throw new Error('Till Number is required.')
 
-      const tillAmount = Number(openingTillTotal || 0)
-      if (!Number.isFinite(tillAmount) || tillAmount < 0) {
-        throw new Error('قيمة Till الصباح غير صحيحة.')
-      }
+      const withdrawalNum = parseNonNegNumber(withdrawalCash)
+      if (withdrawalNum === null) throw new Error('Withdrawal Cash must be a non-negative number.')
+
+      const sendMoneyNum = parseNonNegNumber(sendMoney)
+      if (sendMoneyNum === null) throw new Error('Send Money must be a non-negative number.')
 
       const payload = {
         date: today,
         openingCashTotal: totalCash,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
-        openingTillTotal: tillAmount,
+        // Back-compat: backend currently reads mpesaWithdrawal. We also send a clearer name.
+        mpesaWithdrawal: withdrawalNum,
+        withdrawalCash: withdrawalNum,
+        sendMoney: sendMoneyNum,
         employee: getEmployee(),
         openedAt: new Date().toISOString(),
       }
@@ -221,7 +249,7 @@ function CashPage() {
       })
 
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data?.error || 'فشل حفظ بداية اليوم.')
+      if (!r.ok) throw new Error(data?.error || 'Failed to save Start Day.')
 
       const newDay = {
         date: today,
@@ -229,15 +257,17 @@ function CashPage() {
         openingCashTotal: totalCash,
         cashBreakdown: payload.cashBreakdown,
         tillNo: tillNo.trim(),
-        openingTillTotal: tillAmount,
+        mpesaWithdrawal: withdrawalNum,
+        withdrawalCash: withdrawalNum,
+        sendMoney: sendMoneyNum,
         openedAt: payload.openedAt,
       }
 
       setDayOpen(newDay)
       setDayOpenState(newDay)
-      setOk('تم تسجيل بداية اليوم بنجاح.')
+      setOk('Start Day saved successfully.')
     } catch (e2) {
-      setErr(e2.message || 'فشل حفظ بداية اليوم.')
+      setErr(e2.message || 'Failed to save Start Day.')
     } finally {
       setLoading(false)
     }
@@ -250,13 +280,14 @@ function CashPage() {
     setLoading(true)
 
     try {
-      if (totalCash === null) throw new Error('أدخل أرقام صحيحة في خانة العد.')
-      if (!tillNo.trim()) throw new Error('رقم الدرج (Till) مطلوب.')
+      if (totalCash === null) throw new Error('Please enter valid whole numbers for cash counts.')
+      if (!tillNo.trim()) throw new Error('Till Number is required.')
 
-      const tillAmount = Number(closingTillTotal || 0)
-      if (!Number.isFinite(tillAmount) || tillAmount < 0) {
-        throw new Error('قيمة Till المساء غير صحيحة.')
-      }
+      const withdrawalNum = parseNonNegNumber(withdrawalCash)
+      if (withdrawalNum === null) throw new Error('Withdrawal Cash must be a non-negative number.')
+
+      const sendMoneyNum = parseNonNegNumber(sendMoney)
+      if (sendMoneyNum === null) throw new Error('Send Money must be a non-negative number.')
 
       const payload = {
         date: today,
@@ -264,7 +295,9 @@ function CashPage() {
         closingCashTotal: totalCash,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
-        closingTillTotal: tillAmount,
+        mpesaWithdrawal: withdrawalNum,
+        withdrawalCash: withdrawalNum,
+        sendMoney: sendMoneyNum,
         employee: getEmployee(),
         closedAt: new Date().toISOString(),
       }
@@ -280,13 +313,13 @@ function CashPage() {
       })
 
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data?.error || 'فشل حفظ نهاية اليوم.')
+      if (!r.ok) throw new Error(data?.error || 'Failed to save End Day.')
 
       clearSession()
       setDayOpenState(null)
       nav('/login', { replace: true })
     } catch (e2) {
-      setErr(e2.message || 'فشل حفظ نهاية اليوم.')
+      setErr(e2.message || 'Failed to save End Day.')
     } finally {
       setLoading(false)
     }
@@ -297,9 +330,9 @@ function CashPage() {
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="text-xl font-extrabold">
-            {isOpenedToday ? 'نهاية اليوم (أموال المساء)' : 'بداية اليوم (أموال الصباح)'}
+            {isOpenedToday ? 'End Day (Evening Balances)' : 'Start Day (Morning Balances)'}
           </h2>
-          <div className="text-sm opacity-80">التاريخ: {today}</div>
+          <div className="text-sm opacity-80">Date: {today}</div>
         </div>
 
         {isOpenedToday && (
@@ -308,23 +341,81 @@ function CashPage() {
             className="px-4 py-2 rounded-xl border border-black/20 bg-white/70 hover:bg-white/90"
             onClick={() => nav('/overview')}
           >
-            الذهاب للملخص
+            Go to Overview
           </button>
         )}
       </div>
 
       {isOpenedToday && (
         <div className="text-sm opacity-80 mb-3">
-          أموال الصباح المسجلة: <b>KSh {Number(dayOpenState?.openingCashTotal || 0)}</b>
+          Morning cash recorded: <b>KSh {Number(dayOpenState?.openingCashTotal || 0)}</b>
         </div>
       )}
 
       <form onSubmit={isOpenedToday ? submitEndDay : submitStartDay} className="space-y-4">
         <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.75)' }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold">عدّ النقد (حسب الفئات)</h3>
+            <h3 className="text-lg font-semibold">Payment Methods</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-semibold mb-1">Withdrawal Cash (KSh)</label>
+              <input
+                value={withdrawalCash}
+                onChange={(e) => setWithdrawalCash(e.target.value)}
+                inputMode="decimal"
+                placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: 10,
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,0,0,0.2)',
+                  background: 'white',
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Till Number</label>
+              <input
+                value={tillNo}
+                onChange={(e) => setTillNo(e.target.value)}
+                placeholder="e.g. TILL-1"
+                style={{
+                  width: '100%',
+                  padding: 10,
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,0,0,0.2)',
+                  background: 'white',
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Send Money (KSh)</label>
+              <input
+                value={sendMoney}
+                onChange={(e) => setSendMoney(e.target.value)}
+                inputMode="decimal"
+                placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: 10,
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,0,0,0.2)',
+                  background: 'white',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.75)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold">Cash (by denominations)</h3>
             <div className="text-sm opacity-90">
-              الإجمالي: <span className="font-bold">{totalCash === null ? '—' : `KSh ${totalCash}`}</span>
+              Total Cash: <span className="font-bold">{totalCash === null ? '—' : `KSh ${totalCash}`}</span>
             </div>
           </div>
 
@@ -350,65 +441,11 @@ function CashPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ background: 'rgba(255,255,255,0.75)' }}>
-          <div>
-            <label className="block text-sm font-semibold mb-1">رقم الدرج (Till)</label>
-            <input
-              value={tillNo}
-              onChange={(e) => setTillNo(e.target.value)}
-              placeholder="مثال: TILL-1"
-              style={{
-                width: '100%',
-                padding: 10,
-                borderRadius: 12,
-                border: '1px solid rgba(0,0,0,0.2)',
-                background: 'white',
-              }}
-            />
-          </div>
-
-          {!isOpenedToday ? (
-            <div>
-              <label className="block text-sm font-semibold mb-1">مبلغ Till الصباح (اختياري)</label>
-              <input
-                value={openingTillTotal}
-                onChange={(e) => setOpeningTillTotal(e.target.value)}
-                inputMode="numeric"
-                placeholder="0"
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  borderRadius: 12,
-                  border: '1px solid rgba(0,0,0,0.2)',
-                  background: 'white',
-                }}
-              />
-            </div>
-          ) : (
-            <div>
-              <label className="block text-sm font-semibold mb-1">مبلغ Till المساء (اختياري)</label>
-              <input
-                value={closingTillTotal}
-                onChange={(e) => setClosingTillTotal(e.target.value)}
-                inputMode="numeric"
-                placeholder="0"
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  borderRadius: 12,
-                  border: '1px solid rgba(0,0,0,0.2)',
-                  background: 'white',
-                }}
-              />
-            </div>
-          )}
-        </div>
-
         {err && <div className="text-sm" style={{ color: '#b00020' }}>{err}</div>}
         {ok && <div className="text-sm" style={{ color: '#1b5e20' }}>{ok}</div>}
 
         <button disabled={loading} className="btn-gold" type="submit">
-          {loading ? 'جارٍ الحفظ...' : isOpenedToday ? 'نهاية اليوم' : 'بدء اليوم'}
+          {loading ? 'Saving...' : isOpenedToday ? 'End Day' : 'Start Day'}
         </button>
       </form>
     </div>

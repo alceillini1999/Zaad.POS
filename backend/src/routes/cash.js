@@ -52,7 +52,7 @@ function pmKey(v) {
 
 // Read last closing cash before given date (YYYY-MM-DD)
 async function getYesterdayClosing(date) {
-  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:I');
+  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:J');
   let bestDate = '';
   let bestClosing = 0;
 
@@ -71,7 +71,7 @@ async function getYesterdayClosing(date) {
 
 // Find open row for date
 async function findOpenRow(date) {
-  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:I');
+  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
   const found = (rows || []).find(r => String(r[0] || '') === date);
   return { rows, found };
 }
@@ -117,7 +117,7 @@ router.get('/today', async (req, res) => {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
-    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:I');
+    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
 
     const found = (rows || []).find(r => String(r[0] || '') === date);
     if (!found) return res.json({ ok: true, found: false });
@@ -135,6 +135,7 @@ router.get('/today', async (req, res) => {
         mpesaWithdrawal: Number(found[6] || 0),
         openingCashTotal: Number(found[7] || 0),
         cashBreakdown: safeArr(found[8]),
+        sendMoney: Number(found[9] || 0),
       }
     });
   } catch (e) {
@@ -178,6 +179,7 @@ router.get('/summary', async (req, res) => {
         0,                       // G mpesaWithdrawal (legacy)
         Number(openingCashTotal),// H openingCashTotal
         JSON.stringify([]),      // I cashBreakdown
+        0,                       // J sendMoney
       ]);
     }
 
@@ -228,9 +230,15 @@ router.post('/open', async (req, res) => {
       return res.status(400).json({ error: 'openingCashTotal must be a non-negative number' });
     }
 
-    const mpesaWithdrawal = toNum(body.mpesaWithdrawal, 0);
+    // Back-compat: allow both mpesaWithdrawal and withdrawalCash
+    const mpesaWithdrawal = toNum(body.mpesaWithdrawal ?? body.withdrawalCash, 0);
     if (mpesaWithdrawal < 0) {
       return res.status(400).json({ error: 'mpesaWithdrawal must be a non-negative number' });
+    }
+
+    const sendMoney = toNum(body.sendMoney, 0);
+    if (sendMoney < 0) {
+      return res.status(400).json({ error: 'sendMoney must be a non-negative number' });
     }
 
     const employee = safeObj(body.employee);
@@ -259,9 +267,10 @@ router.post('/open', async (req, res) => {
       Number(mpesaWithdrawal),
       Number(openingCashTotal),
       JSON.stringify(cashBreakdown),
+      Number(sendMoney),
     ]);
 
-    res.json({ ok: true, openId, openingCashTotal });
+    res.json({ ok: true, openId, openingCashTotal, sendMoney });
   } catch (e) {
     console.error('POST /api/cash/open:', e?.message || e);
     res.status(500).json({ error: 'Failed to save Start Day' });
@@ -280,9 +289,15 @@ router.post('/close', async (req, res) => {
     const tillNo = String(body.tillNo || DEFAULT_TILL_NO).trim();
     if (!tillNo) return res.status(400).json({ error: 'tillNo is required' });
 
-    const mpesaWithdrawal = toNum(body.mpesaWithdrawal, 0);
+    // Back-compat: allow both mpesaWithdrawal and withdrawalCash
+    const mpesaWithdrawal = toNum(body.mpesaWithdrawal ?? body.withdrawalCash, 0);
     if (mpesaWithdrawal < 0) {
       return res.status(400).json({ error: 'mpesaWithdrawal must be a non-negative number' });
+    }
+
+    const sendMoney = toNum(body.sendMoney, 0);
+    if (sendMoney < 0) {
+      return res.status(400).json({ error: 'sendMoney must be a non-negative number' });
     }
 
     const employee = safeObj(body.employee);
@@ -307,6 +322,7 @@ router.post('/close', async (req, res) => {
         const openedAt = new Date().toISOString();
         await appendRow(SHEET_ID, OPEN_TAB, [
           date, newOpenId, openedAt, '', '', DEFAULT_TILL_NO, 0, Number(openingCashTotal), JSON.stringify([]),
+          0,
         ]);
       } else {
         openingCashTotal = toNum(found[7], 0);
@@ -331,9 +347,10 @@ router.post('/close', async (req, res) => {
       Number(mpesaWithdrawal),
       Number(closingCashTotal),
       JSON.stringify(cashBreakdown),
+      Number(sendMoney),
     ]);
 
-    res.json({ ok: true, closingCashTotal });
+    res.json({ ok: true, closingCashTotal, sendMoney });
   } catch (e) {
     console.error('POST /api/cash/close:', e?.message || e);
     res.status(500).json({ error: 'Failed to save End Day' });
