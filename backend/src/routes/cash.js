@@ -17,6 +17,15 @@ const DEFAULT_TILL_NO = process.env.DEFAULT_TILL_NO || 'TILL-1';
 // Accept YYYY-MM-DD, or any parseable date -> YYYY-MM-DD
 function normalizeDate(v) {
   if (v == null) return '';
+  // Google Sheets may return date/datetime cells as serial numbers when using
+  // valueRenderOption: 'UNFORMATTED_VALUE'. Handle that first.
+  // Excel/Sheets serial day 25569 == 1970-01-01.
+  const n = Number(v);
+  if (!Number.isNaN(n) && String(v).trim() !== '' && /^[0-9]+(\.[0-9]+)?$/.test(String(v))) {
+    const ms = Math.round((n - 25569) * 86400 * 1000);
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+
   const s = String(v).trim();
   if (!s) return '';
 
@@ -91,7 +100,7 @@ function pmKey(v) {
 
 // Read last closing cash before given date (YYYY-MM-DD)
 async function getYesterdayClosing(date) {
-  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:J');
+  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:K');
   let bestDate = '';
   let bestClosing = 0;
 
@@ -110,7 +119,7 @@ async function getYesterdayClosing(date) {
 
 // Find open row for date
 async function findOpenRow(date) {
-  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
+  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K');
   const found = (rows || []).find(r => normalizeDate(r[0]) === date);
   return { rows, found };
 }
@@ -156,7 +165,7 @@ router.get('/today', async (req, res) => {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
-    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
+    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K');
 
     const found = (rows || []).find(r => normalizeDate(r[0]) === date);
     if (!found) return res.json({ ok: true, found: false });
@@ -165,7 +174,7 @@ router.get('/today', async (req, res) => {
       ok: true,
       found: true,
       row: {
-        date: found[0] || '',
+        date: normalizeDate(found[0]) || '',
         openId: found[1] || '',
         openedAt: found[2] || '',
         employeeId: found[3] || '',
@@ -175,6 +184,7 @@ router.get('/today', async (req, res) => {
         openingCashTotal: Number(found[7] || 0),
         cashBreakdown: safeArr(found[8]),
         sendMoney: Number(found[9] || 0),
+        openingTillTotal: Number(found[10] || 0),
       }
     });
   } catch (e) {
@@ -219,6 +229,7 @@ router.get('/summary', async (req, res) => {
         Number(openingCashTotal),// H openingCashTotal
         JSON.stringify([]),      // I cashBreakdown
         0,                       // J sendMoney
+        0,                       // K openingTillTotal
       ]);
     }
 
@@ -249,6 +260,10 @@ router.get('/summary', async (req, res) => {
 
 // ============ POST /api/cash/open (kept, but now supports AUTO openingCashTotal) ============
 router.post('/open', async (req, res) => {
+    const openingTillTotal = toNum(body.openingTillTotal, 0);
+    if (openingTillTotal < 0) {
+      return res.status(400).json({ error: 'openingTillTotal must be a non-negative number' });
+    }
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
@@ -280,6 +295,11 @@ router.post('/open', async (req, res) => {
       return res.status(400).json({ error: 'sendMoney must be a non-negative number' });
     }
 
+    const openingTillTotal = toNum(body.openingTillTotal, 0);
+    if (openingTillTotal < 0) {
+      return res.status(400).json({ error: 'openingTillTotal must be a non-negative number' });
+    }
+
     const employee = safeObj(body.employee);
     const employeeId = String(employee.id || employee.employeeId || employee.employeeid || employee.username || '').trim();
     const employeeName = String(employee.name || employee.employeeName || employee.username || '').trim();
@@ -307,9 +327,10 @@ router.post('/open', async (req, res) => {
       Number(openingCashTotal),
       JSON.stringify(cashBreakdown),
       Number(sendMoney),
+      Number(openingTillTotal),
     ]);
 
-    res.json({ ok: true, openId, openingCashTotal, sendMoney });
+    res.json({ ok: true, openId, openingCashTotal, openingTillTotal, sendMoney });
   } catch (e) {
     console.error('POST /api/cash/open:', e?.message || e);
     res.status(500).json({ error: 'Failed to save Start Day' });
