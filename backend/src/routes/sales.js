@@ -37,6 +37,30 @@ function dmy2Parts(date) {
 }
 
 function safeJson(s) { try { return JSON.parse(s); } catch { return []; } }
+
+function parseSheetDate(v) {
+  // Supports: ISO string, epoch milliseconds, and Google/Excel serial day numbers.
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return Number.isFinite(v.getTime()) ? v : null;
+  if (typeof v === 'number') {
+    // epoch ms
+    if (v > 1e11) {
+      const d = new Date(v);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    // Excel/Sheets serial days (roughly 25569 days from 1970-01-01)
+    // Google Sheets serial is days since 1899-12-30.
+    if (v > 20000 && v < 90000) {
+      const ms = Math.round((v - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      return Number.isFinite(d.getTime()) ? d : null;
+    }
+    return null;
+  }
+  const s = String(v);
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
 // A: DateTime, B: InvoiceNo, C: ClientName, D: ClientPhone
 // E: PaymentMethod, F: ItemsCount, G: Total, H: Profit, I: ItemsJSON
 function rowToSale(row) {
@@ -70,8 +94,7 @@ router.get('/', async (req, res) => {
     const perDay = new Map();
     let all = raw.map((row, idx) => {
       const sale = rowToSale(row);
-      let dt = null;
-      try { dt = sale.createdAt ? new Date(sale.createdAt) : null; } catch { dt = null; }
+      const dt = parseSheetDate(sale.createdAt);
       const key = dt ? ymdKey(dt) : '';
       const n = (perDay.get(key) || 0) + 1;
       perDay.set(key, n);
@@ -94,11 +117,19 @@ router.get('/', async (req, res) => {
       );
     }
 
+    // ✅ ترتيب من الأحدث إلى الأقدم (لحل مشكلة "مبيعات موجودة بالشيت لكن لا تظهر")
+    all.sort((a, b) => {
+      const da = parseSheetDate(a.createdAt)?.getTime() || 0;
+      const db = parseSheetDate(b.createdAt)?.getTime() || 0;
+      return db - da;
+    });
+
     const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 20);
+    const limit = Number(req.query.limit || 50);
     const start = (page - 1) * limit;
     const end = start + limit;
-    res.json({ rows: all.slice(start, end), count: all.length, total: all.length });
+    const pageCount = limit > 0 ? Math.max(1, Math.ceil(all.length / limit)) : 1;
+    res.json({ rows: all.slice(start, end), count: all.length, total: all.length, page, limit, pageCount });
   } catch (e) {
     console.error('GET /api/sales error:', e?.message || e);
     res.status(500).json({ error: 'Failed to read sales from Google Sheet' });
@@ -132,10 +163,14 @@ router.post('/google', async (req, res) => {
       });
       const times = (prev.data.values || []).map(r => r?.[0]).filter(Boolean);
       const countToday = times.reduce((acc, t) => {
+        const d = parseSheetDate(t);
+        if (!d) return acc;
         try {
-          const dk = ymdKey(new Date(t));
+          const dk = ymdKey(d);
           return acc + (dk === todayKey ? 1 : 0);
-        } catch { return acc; }
+        } catch {
+          return acc;
+        }
       }, 0);
       seq = countToday + 1;
     } catch (e) {

@@ -10,14 +10,15 @@ export default function SalesPage(){
   const [count,setCount] = useState(0)
   const [q,setQ] = useState('')
   const [page,setPage] = useState(1)
+  const [limit,setLimit] = useState(50)
   const [details,setDetails] = useState(null)
 
   async function load(){
-    const res = await fetch(url('/api/sales') + `?page=${page}&limit=20&q=${encodeURIComponent(q)}`, { credentials:'include' })
+    const res = await fetch(url('/api/sales') + `?page=${page}&limit=${limit}&q=${encodeURIComponent(q)}`, { credentials:'include' })
     const d = await res.json()
     setRows(d.rows||[]); setCount(d.count ?? d.total ?? 0)
   }
-  useEffect(()=>{ load().catch(()=>{}) },[page,q])
+  useEffect(()=>{ load().catch(()=>{}) },[page,q,limit])
 
   function openDetails(row){
     setDetails(row)
@@ -29,7 +30,44 @@ export default function SalesPage(){
         <h1 className="text-xl font-semibold">Sales</h1>
         <div className="flex items-center gap-2">
           <input value={q} onChange={e=>{setPage(1); setQ(e.target.value)}} placeholder="Search by invoice or customer" className="border rounded px-3 py-2"/>
+          <select
+            value={limit}
+            onChange={e=>{ setPage(1); setLimit(Number(e.target.value||50)); }}
+            className="border rounded px-3 py-2"
+            title="Rows per page"
+          >
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
           <button className="btn-gold" onClick={()=>load().catch(()=>{})}>Refresh</button>
+        </div>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between text-sm">
+        <div className="text-mute">
+          Showing <b>{rows.length}</b> of <b>{count}</b>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-gold px-3 py-1 rounded"
+            onClick={()=>setPage(p=>Math.max(1, p-1))}
+            disabled={page <= 1}
+            type="button"
+          >
+            Prev
+          </button>
+          <span>Page <b>{page}</b> / <b>{Math.max(1, Math.ceil((count||0)/limit))}</b></span>
+          <button
+            className="btn-gold px-3 py-1 rounded"
+            onClick={()=>setPage(p=>p+1)}
+            disabled={page * limit >= (count||0)}
+            type="button"
+          >
+            Next
+          </button>
         </div>
       </div>
 
