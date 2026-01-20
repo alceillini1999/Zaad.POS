@@ -82,7 +82,7 @@ const icons = {
 };
 
 const NAV = [
-  { to: "/overview", label: "Overview", key: "overview" },
+  { to: "/overview", label: "Daily Report", key: "overview" },
   { to: "/summery", label: "Summary", key: "summary" },
   { to: "/pos", label: "POS", key: "pos" },
   { to: "/sales", label: "Sales", key: "sales" },

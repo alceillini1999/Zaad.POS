@@ -41,7 +41,25 @@ const endOfDay = (d) => {
   return x;
 };
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
-const fmtD = (d) => new Date(d).toISOString().slice(0, 10);
+
+// IMPORTANT:
+// We use *local* calendar date (NOT UTC) because this page is a DAILY report.
+// Using toISOString().slice(0,10) can shift the date depending on timezone.
+const toLocalYMD = (d) => {
+  const x = new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const day = String(x.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const parseYMDLocal = (s) => {
+  const [y, m, d] = String(s || "").split("-").map((v) => parseInt(v, 10));
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d);
+};
+
+const fmtD = (d) => toLocalYMD(d);
 
 function getToken() {
   try {
@@ -68,9 +86,17 @@ function StatIcon({ children }) {
 }
 
 export default function OverviewPage() {
-  const today = new Date().toISOString().slice(0, 10);
-  const [fromDate, setFromDate] = useState(today);
-  const [toDate, setToDate] = useState(today);
+  // Daily report is ALWAYS for the current local date.
+  const [reportDate, setReportDate] = useState(() => toLocalYMD(new Date()));
+
+  // Keep date in sync (if the tab stays open across midnight)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const k = toLocalYMD(new Date());
+      setReportDate((prev) => (prev === k ? prev : k));
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -95,10 +121,12 @@ export default function OverviewPage() {
     })();
   }, []);
 
-  const dFrom = useMemo(() => startOfDay(new Date(fromDate)), [fromDate]);
-  const dTo = useMemo(() => endOfDay(new Date(toDate)), [toDate]);
-  const oneDay = useMemo(() => sameDay(dFrom, dTo), [dFrom, dTo]);
-  const dayKey = useMemo(() => fmtD(dFrom), [dFrom]);
+  const dFrom = useMemo(() => startOfDay(parseYMDLocal(reportDate)), [reportDate]);
+  const dTo = useMemo(() => endOfDay(parseYMDLocal(reportDate)), [reportDate]);
+
+  // Daily report => single day
+  const oneDay = true;
+  const dayKey = reportDate;
 
   // Load manual withdrawals for selected single day (local only)
   const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
@@ -319,32 +347,16 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header + Date Range */}
+      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="ui-h1">Overview</div>
-          <div className="ui-sub mt-1">Sales, expenses, and net profit for the selected range.</div>
+          <div className="ui-h1">Daily Report</div>
+          <div className="ui-sub mt-1">Today's sales, expenses, payment methods, and cashier expected balances.</div>
         </div>
 
         <div className="ui-card p-3 md:p-4 flex flex-wrap items-center gap-3">
-          <div className="text-xs font-bold uppercase tracking-wider text-mute">Range</div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              className="ui-input !w-auto"
-              value={fromDate}
-              max={toDate}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
-            <span className="text-mute">→</span>
-            <input
-              type="date"
-              className="ui-input !w-auto"
-              value={toDate}
-              min={fromDate}
-              onChange={(e) => setToDate(e.target.value)}
-            />
-          </div>
+          <div className="text-xs font-bold uppercase tracking-wider text-mute">Date</div>
+          <div className="font-semibold text-ink">{dayKey}</div>
         </div>
       </div>
 
@@ -353,7 +365,7 @@ export default function OverviewPage() {
         <Card
           title="Total Sales"
           value={K(totals.totalSales)}
-          subtitle="All sales in range"
+          subtitle="Today's sales"
           icon={
             <StatIcon>
               <svg viewBox="0 0 24 24">
@@ -365,7 +377,7 @@ export default function OverviewPage() {
         <Card
           title="Expenses"
           value={K(totals.totalExpenses)}
-          subtitle="Operational costs"
+          subtitle="Today's expenses"
           icon={
             <StatIcon>
               <svg viewBox="0 0 24 24">
@@ -377,7 +389,7 @@ export default function OverviewPage() {
         <Card
           title="Net Profit"
           value={K(totals.netProfit)}
-          subtitle="Sales minus expenses"
+          subtitle="Today: sales - expenses"
           icon={
             <StatIcon>
               <svg viewBox="0 0 24 24">

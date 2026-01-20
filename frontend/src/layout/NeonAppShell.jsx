@@ -11,7 +11,7 @@ const C = {
 };
 
 const LINKS = [
-  { to: "/overview", label: "Overview", icon: "🏠" },
+  { to: "/overview", label: "Daily Report", icon: "🏠" },
   { to: "/whatsapp", label: "WhatsApp", icon: "💬" },
   { to: "/products", label: "Products", icon: "🧾" },
   { to: "/expenses", label: "Expenses", icon: "💸" },

@@ -514,7 +514,7 @@ function CashPage() {
             className="px-4 py-2 rounded-xl border border-black/20 bg-white/70 hover:bg-white/90"
             onClick={() => nav('/overview')}
           >
-            Go to Overview
+            Go to Daily Report
           </button>
         )}
       </div>
