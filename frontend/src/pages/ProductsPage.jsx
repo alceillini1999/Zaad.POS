@@ -12,6 +12,9 @@ const fmtMoney = (n) => {
   catch { const x = Number(n); return isNaN(x) ? '—' : `KSh ${x.toFixed(2)}` }
 }
 
+const CATEGORY_OPTIONS = ['bakery','desserts','Egyptian food','pastries','grocery','Cookies']
+const UNIT_OPTIONS = ['pcs','kg','liter']
+
 export default function ProductsPage(){
   const [rows,setRows] = useState([])
   const [q,setQ]       = useState('')
@@ -116,14 +119,33 @@ export default function ProductsPage(){
                      onChange={e=>setModal(m=>({...m, edit:{...m.edit, stock:+e.target.value}}))}/>
             </label>
             <label className="text-sm">
-              <span className="block text-mute mb-1">Category</span>
-              <input className="border border-line rounded-xl px-3 py-2 w-full" value={modal.edit.category}
-                     onChange={e=>setModal(m=>({...m, edit:{...m.edit, category:e.target.value}}))}/>
+              <span className="block text-mute mb-1">Category (optional)</span>
+              <select
+                className="border border-line rounded-xl px-3 py-2 w-full"
+                value={modal.edit.category || ''}
+                onChange={e=>setModal(m=>({...m, edit:{...m.edit, category:e.target.value}}))}
+              >
+                <option value="">—</option>
+                {/* لو في قيمة قديمة غير موجودة بالقائمة، نظهرها حتى لا تضيع */}
+                {modal.edit.category && !CATEGORY_OPTIONS.includes(modal.edit.category) && (
+                  <option value={modal.edit.category}>{modal.edit.category}</option>
+                )}
+                {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </label>
             <label className="text-sm">
               <span className="block text-mute mb-1">Unit</span>
-              <input className="border border-line rounded-xl px-3 py-2 w-full" value={modal.edit.unit || ''}
-                     onChange={e=>setModal(m=>({...m, edit:{...m.edit, unit:e.target.value}}))}/>
+              <select
+                className="border border-line rounded-xl px-3 py-2 w-full"
+                value={modal.edit.unit || ''}
+                onChange={e=>setModal(m=>({...m, edit:{...m.edit, unit:e.target.value}}))}
+              >
+                <option value="">—</option>
+                {modal.edit.unit && !UNIT_OPTIONS.includes(modal.edit.unit) && (
+                  <option value={modal.edit.unit}>{modal.edit.unit}</option>
+                )}
+                {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
             </label>
             <label className="col-span-2 text-sm">
               <span className="block text-mute mb-1">Notes</span>

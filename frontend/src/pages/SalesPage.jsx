@@ -15,20 +15,12 @@ export default function SalesPage(){
   async function load(){
     const res = await fetch(url('/api/sales') + `?page=${page}&limit=20&q=${encodeURIComponent(q)}`, { credentials:'include' })
     const d = await res.json()
-    setRows(d.rows||[]); setCount(d.count||0)
+    setRows(d.rows||[]); setCount(d.count ?? d.total ?? 0)
   }
   useEffect(()=>{ load().catch(()=>{}) },[page,q])
 
-  async function openDetails(id){
-    const res = await fetch(url(`/api/sales/${id}`), { credentials:'include' })
-    const data = await res.json()
-    setDetails(data)
-  }
-
-  async function syncGoogle(){
-    try { await fetch(url('/api/sales/sync/google-csv?mode=mirror'), { method:'POST' });
-      await load(); alert('Sales synced from Google Sheet.'); }
-    catch (e) { alert('Sync failed:\n' + e.message) }
+  function openDetails(row){
+    setDetails(row)
   }
 
   return (
@@ -37,7 +29,7 @@ export default function SalesPage(){
         <h1 className="text-xl font-semibold">Sales</h1>
         <div className="flex items-center gap-2">
           <input value={q} onChange={e=>{setPage(1); setQ(e.target.value)}} placeholder="Search by invoice or customer" className="border rounded px-3 py-2"/>
-          <button className="btn-gold" onClick={syncGoogle}>Sync Google</button>
+          <button className="btn-gold" onClick={()=>load().catch(()=>{})}>Refresh</button>
         </div>
       </div>
 
@@ -56,15 +48,15 @@ export default function SalesPage(){
           </thead>
           <tbody>
             {rows.map(r=>(
-              <tr key={r._id} className="border-b">
-                <td className="p-2">{r.invoiceNumber}</td>
+              <tr key={r.id || `${r.invoiceNo}-${r.createdAt}`} className="border-b">
+                <td className="p-2">{r.invoiceNo || r.invoiceNumber}</td>
                 <td className="p-2">{r.clientName || r?.client?.name || ''}</td>
                 <td className="p-2">{r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</td>
                 <td className="p-2">{Number(r.total||0).toFixed(2)}</td>
                 <td className="p-2">{r.paymentMethod}</td>
                 <td className="p-2">{Number(r.profit||0).toFixed(2)}</td>
                 <td className="p-2">
-                  <button className="btn-gold px-3 py-1 rounded" onClick={()=>openDetails(r._id)}>Details</button>
+                  <button className="btn-gold px-3 py-1 rounded" onClick={()=>openDetails(r)}>Details</button>
                 </td>
               </tr>
             ))}
@@ -74,9 +66,9 @@ export default function SalesPage(){
 
       {details && (
         <div className="fixed inset-0 bg-black/40 grid place-items-center" onClick={()=>setDetails(null)}>
-          <div className="bg-white rounded-xl p-4 w/full max-w-2xl text-black" onClick={e=>e.stopPropagation()}>
+          <div className="bg-white rounded-xl p-4 w-full max-w-2xl text-black" onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <div className="text-lg font-semibold">Invoice Details {details.invoiceNumber}</div>
+              <div className="text-lg font-semibold">Invoice Details {details.invoiceNo || details.invoiceNumber}</div>
               <button className="btn-gold" onClick={()=>setDetails(null)}>Close</button>
             </div>
             <div className="text-sm mb-2">
@@ -91,7 +83,7 @@ export default function SalesPage(){
                     <td className="p-2 text-center">{it.qty}</td>
                     <td className="p-2 text-center">{Number(it.price||0).toFixed(2)}</td>
                     <td className="p-2 text-center">{Number(it.cost||0).toFixed(2)}</td>
-                    <td className="p-2 text-center">{Number(it.subtotal||0).toFixed(2)}</td>
+                    <td className="p-2 text-center">{Number((Number(it.qty||0) * Number(it.price||0)) || 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

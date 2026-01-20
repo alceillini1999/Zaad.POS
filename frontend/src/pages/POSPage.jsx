@@ -40,21 +40,17 @@ function ProductCard({ p, onAdd }) {
   );
 }
 
-function QtyControl({ value, onChange, onInc, onDec }) {
+function QtyControl({ value, onChange }) {
   return (
-    <div className="flex items-center gap-2">
-      <button className="ui-btn ui-btn-ghost !px-3" onClick={onDec} type="button">
-        -
-      </button>
-      <input
-        className="ui-input !w-[70px] text-center"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <button className="ui-btn ui-btn-ghost !px-3" onClick={onInc} type="button">
-        +
-      </button>
-    </div>
+    <input
+      className="ui-input !w-[90px] text-center"
+      type="number"
+      min="0"
+      step="1"
+      value={value}
+      // السماح بالقيمة الفارغة حتى لا يظهر رقم 1 تلقائياً
+      onChange={(e) => onChange(e.target.value)}
+    />
   );
 }
 
@@ -64,12 +60,11 @@ export default function POSPage() {
   const [cart, setCart] = useState([]);
   const [client, setClient] = useState(null);
 
-  // طرق الدفع: cash / till / withdrawal / send_money
+  // طرق الدفع: cash / till / withdrawal
   const [payment, setPayment] = useState("cash");
 
   // خصم + نقاط + مستلم/باقي
   const [discount, setDiscount] = useState(0);
-  const [addPoints, setAddPoints] = useState(0);
   const [received, setReceived] = useState(0);
 
   const [q, setQ] = useState("");
@@ -95,28 +90,36 @@ export default function POSPage() {
     );
   }, [products, q]);
 
-  const subtotal = useMemo(
-    () => cart.reduce((s, i) => s + Number(i.salePrice || 0) * Number(i.qty || 0), 0),
-    [cart]
-  );
+  const subtotal = useMemo(() => {
+    return cart.reduce((s, i) => {
+      const qty = Number(i.qty);
+      const qn = Number.isFinite(qty) ? qty : 0;
+      return s + Number(i.salePrice || 0) * qn;
+    }, 0);
+  }, [cart]);
   const total = useMemo(() => Math.max(0, subtotal - Number(discount || 0)), [subtotal, discount]);
   const change = useMemo(
     () => (payment === "cash" ? Math.max(0, Number(received || 0) - total) : 0),
     [payment, received, total]
   );
 
+  const autoPoints = useMemo(() => {
+    if (!client) return 0;
+    return Math.floor(Number(total || 0) / 100);
+  }, [client, total]);
+
   function addToCart(p) {
     setCart((prev) => {
       const ex = prev.find((x) => String(x.barcode) === String(p.barcode));
-      if (ex) return prev.map((x) => (x === ex ? { ...x, qty: (x.qty || 0) + 1 } : x));
-      return [...prev, { ...p, qty: 1 }];
+      // إذا المنتج موجود بالفعل، نزيد الكمية (لو كانت فارغة تعتبر 0)
+      if (ex) {
+        const cur = Number(ex.qty);
+        const curN = Number.isFinite(cur) ? cur : 0;
+        return prev.map((x) => (x === ex ? { ...x, qty: String(curN + 1) } : x));
+      }
+      // أول مرة: لا نضع 1 افتراضياً (المستخدم هو من يكتب الكمية)
+      return [...prev, { ...p, qty: "" }];
     });
-  }
-  function inc(it) {
-    setCart((c) => c.map((x) => (x === it ? { ...x, qty: (x.qty || 0) + 1 } : x)));
-  }
-  function dec(it) {
-    setCart((c) => c.map((x) => (x === it ? { ...x, qty: Math.max(1, (x.qty || 0) - 1) } : x)));
   }
   function remove(it) {
     setCart((c) => c.filter((x) => x !== it));
@@ -127,6 +130,17 @@ export default function POSPage() {
       alert("Cart is empty");
       return;
     }
+
+    // ✅ لا يسمح بإتمام البيع لو الكميات غير مُدخلة / غير صحيحة
+    const invalid = cart.find((i) => {
+      const qn = Number(i.qty);
+      return !Number.isFinite(qn) || qn <= 0;
+    });
+    if (invalid) {
+      alert("Please enter a valid quantity for all items");
+      return;
+    }
+
     if (payment === "cash" && Number(received || 0) < total) {
       alert("Received is less than total");
       return;
@@ -135,13 +149,13 @@ export default function POSPage() {
     const items = cart.map((i) => ({
       barcode: i.barcode,
       name: i.name,
-      qty: Number(i.qty || 0),
+      qty: Number(i.qty),
       price: Number(i.salePrice || 0),
       cost: Number(i.cost || 0),
     }));
 
     const payload = {
-      invoiceNo: `${Date.now()}`,
+      // سيتم توليد رقم الفاتورة تلقائياً في الـ Backend
       clientName: client?.name || "",
       clientPhone: client?.phone || "",
       paymentMethod: payment,
@@ -150,7 +164,7 @@ export default function POSPage() {
       discount: Number(discount || 0),
       total,
       profit: items.reduce((s, i) => s + (Number(i.price) - Number(i.cost)) * Number(i.qty), 0),
-      addPoints: Number(addPoints || 0),
+      addPoints: Number(autoPoints || 0),
       received: payment === "cash" ? Number(received || 0) : 0,
       change: payment === "cash" ? change : 0,
     };
@@ -165,10 +179,18 @@ export default function POSPage() {
         const t = await res.text();
         throw new Error(t || `HTTP ${res.status}`);
       }
-      alert(["Sale completed ✅", `Client: ${payload.clientName || "—"}`, `Items: ${items.length}`, `Total: ${K(total)}`].join("\n"));
+      const out = await res.json().catch(() => ({}));
+      const inv = out?.invoiceNo || out?.invoiceNumber || out?.invoice || "";
+      alert([
+        "Sale completed ✅",
+        inv ? `Invoice: ${inv}` : null,
+        `Client: ${payload.clientName || "—"}`,
+        `Items: ${items.length}`,
+        `Total: ${K(total)}`,
+        client ? `Points added: ${autoPoints}` : null,
+      ].filter(Boolean).join("\n"));
       setCart([]);
       setDiscount(0);
-      setAddPoints(0);
       setReceived(0);
       setClient(null);
     } catch (e) {
@@ -237,10 +259,9 @@ export default function POSPage() {
                   <div className="mt-3 flex items-center justify-between">
                     <QtyControl
                       value={it.qty}
-                      onInc={() => inc(it)}
-                      onDec={() => dec(it)}
                       onChange={(raw) => {
-                        const v = Math.max(1, Number(raw || 1));
+                        // raw قد تكون "" (فارغة) — نحتفظ بها كما هي
+                        const v = raw;
                         setCart((list) => list.map((x) => (x === it ? { ...x, qty: v } : x)));
                       }}
                     />
@@ -282,7 +303,6 @@ export default function POSPage() {
                     <option value="cash">Cash</option>
                     <option value="till">Till</option>
                     <option value="withdrawal">Withdrawal</option>
-                    <option value="send_money">Send Money</option>
                   </select>
                 </label>
               </div>
@@ -303,16 +323,17 @@ export default function POSPage() {
                 </div>
               )}
 
-              <label className="block">
-                <span className="ui-label">Add Loyalty Points</span>
-                <input
-                  type="number"
-                  min="0"
-                  className="ui-input mt-1"
-                  value={addPoints}
-                  onChange={(e) => setAddPoints(Number(e.target.value || 0))}
-                />
-              </label>
+              <div className="ui-card p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-mute">Loyalty Points</div>
+                    <div className="mt-1 text-sm text-mute">
+                      {client ? "Auto: 1 point لكل 100" : "Select client for points"}
+                    </div>
+                  </div>
+                  <div className="ui-badge-gold !text-base">{client ? autoPoints : 0}</div>
+                </div>
+              </div>
 
               {/* Client pick */}
               <div className="ui-card p-4">

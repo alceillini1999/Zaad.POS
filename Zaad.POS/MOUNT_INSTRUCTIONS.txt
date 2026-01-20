@@ -1,5 +1,0 @@
-// NOTE: In your server.js, mount these Google routes (ensure they come before any DB-based routes with same paths):
-// app.use('/api/products', require('./routes/products.google'));
-// app.use('/api/clients', require('./routes/clients.google'));
-// app.use('/api/expenses', require('./routes/expenses.google'));
-// app.use('/api/sales', require('./routes/sales.google'));

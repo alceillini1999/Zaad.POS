@@ -79,13 +79,7 @@ export default function OverviewPage() {
       const d = new Date(t);
       return d >= dFrom && d <= dTo;
     };
-    const normPM = (r) => {
-      const raw = String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
-      const s = raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-      if (s === "send money" || s === "sendmoney" || s === "send") return "send_money";
-      if (s === "withdrawel") return "withdrawal"; // common misspelling
-      return s;
-    };
+    const normPM = (r) => String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
 
     const inRangeSales = sales.filter((s) => inRange(s.createdAt));
     const totalSales = inRangeSales.reduce((sum, r) => sum + Number(r.total || 0), 0);
@@ -93,10 +87,6 @@ export default function OverviewPage() {
     const till = inRangeSales.reduce((sum, r) => (normPM(r) === "till" ? sum + Number(r.total || 0) : sum), 0);
     const withdrawal = inRangeSales.reduce(
       (sum, r) => (normPM(r) === "withdrawal" ? sum + Number(r.total || 0) : sum),
-      0
-    );
-    const sendMoney = inRangeSales.reduce(
-      (sum, r) => (normPM(r) === "send_money" ? sum + Number(r.total || 0) : sum),
       0
     );
 
@@ -109,7 +99,6 @@ export default function OverviewPage() {
       cash,
       till,
       withdrawal,
-      sendMoney,
     };
   }, [sales, expenses, dFrom, dTo]);
 
@@ -239,11 +228,10 @@ export default function OverviewPage() {
         title="Payment Method Breakdown"
         subtitle="Computed from POS sales within the selected range"
       >
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
           <Card title="Cash" value={K(totals.cash)} subtitle="Paid in Cash" />
           <Card title="Till" value={K(totals.till)} subtitle="Paid via Till" />
-          <Card title="Withdrawal" value={K(totals.withdrawal)} subtitle="Paid via Withdrawal" />
-          <Card title="Send Money" value={K(totals.sendMoney)} subtitle="Paid via Send Money" />
+          <Card title="Withdrawal" value={K(totals.withdrawal)} subtitle="Recorded as Withdrawal" />
         </div>
       </Section>
 
