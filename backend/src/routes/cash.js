@@ -86,16 +86,12 @@ function safeArr(v) {
 }
 
 function pmKey(v) {
-  const raw = String(v || '').trim().toLowerCase();
-  const s = raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (s === 'send money' || s === 'sendmoney') return 'send_money';
-  if (s === 'withdrawel') return 'withdrawal';
-  return s;
+  return String(v || '').trim().toLowerCase();
 }
 
 // Read last closing cash before given date (YYYY-MM-DD)
 async function getYesterdayClosing(date) {
-  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:K');
+  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:J');
   let bestDate = '';
   let bestClosing = 0;
 
@@ -114,7 +110,7 @@ async function getYesterdayClosing(date) {
 
 // Find open row for date
 async function findOpenRow(date) {
-  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K');
+  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
   const found = (rows || []).find(r => normalizeDate(r[0]) === date);
   return { rows, found };
 }
@@ -124,16 +120,13 @@ async function findOpenRow(date) {
 // A: DateTime, E: PaymentMethod, G: Total
 async function sumTodayFromSales(date) {
   if (!SALES_SHEET_ID) {
-    return { cashSales: 0, tillSales: 0, withdrawalSales: 0, sendMoneySales: 0, withdrawals: 0 };
+    return { cashSales: 0, tillSales: 0, withdrawals: 0 };
   }
 
   const rows = await readRows(SALES_SHEET_ID, SALES_TAB, 'A2:I');
 
   let cashSales = 0;
   let tillSales = 0;
-  let withdrawalSales = 0;
-  let sendMoneySales = 0;
-  // Back-compat: "withdrawals" used to mean cash-out. Now Withdrawal is a payment method.
   let withdrawals = 0;
 
   for (const r of (rows || [])) {
@@ -149,13 +142,12 @@ async function sumTodayFromSales(date) {
     } else if (method === 'till') {
       tillSales += total;
     } else if (method === 'withdrawal') {
-      withdrawalSales += total;
-    } else if (method === 'send_money') {
-      sendMoneySales += total;
+      // treat as cash out (withdrawal)
+      withdrawals += Math.abs(total);
     }
   }
 
-  return { cashSales, tillSales, withdrawalSales, sendMoneySales, withdrawals };
+  return { cashSales, tillSales, withdrawals };
 }
 
 // ============ Existing endpoint: read today's open ============
@@ -164,7 +156,7 @@ router.get('/today', async (req, res) => {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
-    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K');
+    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
 
     const found = (rows || []).find(r => normalizeDate(r[0]) === date);
     if (!found) return res.json({ ok: true, found: false });
@@ -180,11 +172,9 @@ router.get('/today', async (req, res) => {
         employeeName: found[4] || '',
         tillNo: found[5] || '',
         mpesaWithdrawal: Number(found[6] || 0),
-        withdrawalCash: Number(found[6] || 0),
         openingCashTotal: Number(found[7] || 0),
         cashBreakdown: safeArr(found[8]),
         sendMoney: Number(found[9] || 0),
-        openingTillTotal: Number(found[10] || 0),
       }
     });
   } catch (e) {
@@ -229,7 +219,6 @@ router.get('/summary', async (req, res) => {
         Number(openingCashTotal),// H openingCashTotal
         JSON.stringify([]),      // I cashBreakdown
         0,                       // J sendMoney
-        0,                       // K openingTillTotal
       ]);
     }
 
@@ -237,12 +226,10 @@ router.get('/summary', async (req, res) => {
     const totals = await sumTodayFromSales(date);
 
     // 3) Expected cash in drawer (what you want “مساءً” بدون إدخال يدوي)
-    // Expected cash (drawer) is only impacted by cash sales (Withdrawal is a payment method).
-    const expectedDrawerCash = openingCashTotal + totals.cashSales;
+    const expectedDrawerCash = openingCashTotal + totals.cashSales - totals.withdrawals;
 
     // Optional reporting:
-    const totalReceivedAllMethods =
-      totals.cashSales + totals.tillSales + (totals.withdrawalSales || 0) + (totals.sendMoneySales || 0);
+    const totalReceivedAllMethods = totals.cashSales + totals.tillSales;
 
     return res.json({
       ok: true,
@@ -293,11 +280,6 @@ router.post('/open', async (req, res) => {
       return res.status(400).json({ error: 'sendMoney must be a non-negative number' });
     }
 
-    const openingTillTotal = toNum(body.openingTillTotal, 0);
-    if (openingTillTotal < 0) {
-      return res.status(400).json({ error: 'openingTillTotal must be a non-negative number' });
-    }
-
     const employee = safeObj(body.employee);
     const employeeId = String(employee.id || employee.employeeId || employee.employeeid || employee.username || '').trim();
     const employeeName = String(employee.name || employee.employeeName || employee.username || '').trim();
@@ -325,10 +307,9 @@ router.post('/open', async (req, res) => {
       Number(openingCashTotal),
       JSON.stringify(cashBreakdown),
       Number(sendMoney),
-      Number(openingTillTotal),
     ]);
 
-    res.json({ ok: true, openId, openingCashTotal, sendMoney, openingTillTotal });
+    res.json({ ok: true, openId, openingCashTotal, sendMoney });
   } catch (e) {
     console.error('POST /api/cash/open:', e?.message || e);
     res.status(500).json({ error: 'Failed to save Start Day' });
@@ -358,11 +339,6 @@ router.post('/close', async (req, res) => {
       return res.status(400).json({ error: 'sendMoney must be a non-negative number' });
     }
 
-    const closingTillTotal = toNum(body.closingTillTotal, 0);
-    if (closingTillTotal < 0) {
-      return res.status(400).json({ error: 'closingTillTotal must be a non-negative number' });
-    }
-
     const employee = safeObj(body.employee);
     const employeeId = String(employee.id || employee.employeeId || employee.employeeid || employee.username || '').trim();
     const employeeName = String(employee.name || employee.employeeName || employee.username || '').trim();
@@ -386,15 +362,13 @@ router.post('/close', async (req, res) => {
         await appendRow(SHEET_ID, OPEN_TAB, [
           date, newOpenId, openedAt, '', '', DEFAULT_TILL_NO, 0, Number(openingCashTotal), JSON.stringify([]),
           0,
-          0,
         ]);
       } else {
         openingCashTotal = toNum(found[7], 0);
       }
 
       const totals = await sumTodayFromSales(date);
-      // Withdrawal is a payment method (not a cash-out), so it should not reduce expected cash.
-      closingCashTotal = openingCashTotal + totals.cashSales;
+      closingCashTotal = openingCashTotal + totals.cashSales - totals.withdrawals;
     }
 
     closingCashTotal = toNum(closingCashTotal, 0);
@@ -413,10 +387,9 @@ router.post('/close', async (req, res) => {
       Number(closingCashTotal),
       JSON.stringify(cashBreakdown),
       Number(sendMoney),
-      Number(closingTillTotal),
     ]);
 
-    res.json({ ok: true, closingCashTotal, sendMoney, closingTillTotal });
+    res.json({ ok: true, closingCashTotal, sendMoney });
   } catch (e) {
     console.error('POST /api/cash/close:', e?.message || e);
     res.status(500).json({ error: 'Failed to save End Day' });

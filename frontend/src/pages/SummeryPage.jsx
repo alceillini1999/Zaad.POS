@@ -32,8 +32,6 @@ const endOfDay = (d) => {
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
 const fmtD = (d) => new Date(d).toISOString().slice(0, 10);
 
-}
-
 function normPM(r) {
   const raw = String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
   const s = raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
@@ -209,7 +207,7 @@ export default function SummeryPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="ui-h1">Summary</div>
-          <div className="ui-sub mt-1">Totals + manual withdrawals with details</div>
+          <div className="ui-sub mt-1">Totals and manual withdrawals</div>
         </div>
         <div className="ui-badge">
           Range: <b className="ml-1">{fromDate}</b> → <b>{toDate}</b>
@@ -231,7 +229,7 @@ export default function SummeryPage() {
             <div className="text-xs font-bold uppercase tracking-wider text-mute">Mode</div>
             <div className="mt-1 font-extrabold text-ink">{isSingleDay ? "Single Day" : "Range"}</div>
             <div className="ui-sub mt-1">
-              Manual withdrawals work on a single day: set <b>From = To</b>.
+              To manage manual withdrawals, set <b>From = To</b>.
             </div>
           </div>
         </div>
@@ -304,6 +302,7 @@ export default function SummeryPage() {
           </>
         )}
       </Section>
+
     </div>
   );
 }

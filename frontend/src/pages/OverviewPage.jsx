@@ -63,7 +63,6 @@ async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
   }
 }
 
-
 function StatIcon({ children }) {
   return <span className="h-6 w-6 text-ink/70">{children}</span>;
 }
@@ -77,9 +76,9 @@ export default function OverviewPage() {
   const [expenses, setExpenses] = useState([]);
 
   // Cashier (single day)
-  const [withdrawals, setWithdrawals] = useState([]);
   const [openInfo, setOpenInfo] = useState(null);
   const [openInfoStatus, setOpenInfoStatus] = useState("idle"); // idle | loading | ok | timeout | error
+  const [withdrawals, setWithdrawals] = useState([]); // local-only manual withdrawals (single day)
 
   useEffect(() => {
     (async () => {
@@ -101,7 +100,7 @@ export default function OverviewPage() {
   const oneDay = useMemo(() => sameDay(dFrom, dTo), [dFrom, dTo]);
   const dayKey = useMemo(() => fmtD(dFrom), [dFrom]);
 
-  // Load manual withdrawals from localStorage (single day)
+  // Load manual withdrawals for selected single day (local only)
   const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
   useEffect(() => {
     if (!oneDay) {
@@ -117,6 +116,15 @@ export default function OverviewPage() {
     }
   }, [oneDay, dayKey]);
 
+  const withdrawalManual = useMemo(() => {
+    const sum = (src) => (withdrawals || []).filter((w) => w.source === src).reduce((s, w) => s + Number(w.amount || 0), 0);
+    const cash = sum("cash");
+    const till = sum("till");
+    const withdrawal = sum("withdrawal");
+    const sendMoney = sum("send_money");
+    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
+  }, [withdrawals]);
+
   // Load opening values from Cash page / backend sheet (single day)
   useEffect(() => {
     if (!oneDay) {
@@ -128,7 +136,7 @@ export default function OverviewPage() {
     let cancelled = false;
     const token = getToken();
 
-    // Best-effort from localStorage dayOpen (often today)
+    // Immediate best-effort from localStorage dayOpen (often today)
     try {
       const raw = localStorage.getItem("dayOpen");
       const d = raw ? JSON.parse(raw) : null;
@@ -151,10 +159,11 @@ export default function OverviewPage() {
       setOpenInfoStatus("loading");
       try {
         const { res, data } = await fetchJsonWithTimeout(
-          `/api/cash/today?date=${encodeURIComponent(dayKey)}`,
+          url(`/api/cash/today?date=${encodeURIComponent(dayKey)}`),
           {
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             cache: "no-store",
+            credentials: "include",
           },
           2500
         );
@@ -234,19 +243,6 @@ export default function OverviewPage() {
     };
   }, [sales, expenses, dFrom, dTo]);
 
-
-  const withdrawalManual = useMemo(() => {
-    const sum = (src) =>
-      withdrawals
-        .filter((w) => w.source === src)
-        .reduce((s, w) => s + Number(w.amount || 0), 0);
-    const cash = sum("cash");
-    const till = sum("till");
-    const withdrawal = sum("withdrawal");
-    const sendMoney = sum("send_money");
-    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
-  }, [withdrawals]);
-
   const openings = useMemo(() => {
     if (!oneDay || !openInfo?.found) {
       return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0 };
@@ -268,7 +264,6 @@ export default function OverviewPage() {
     const till = openings.till + Number(totals.till || 0) - Number(withdrawalManual.till || 0);
     const withdrawal = openings.withdrawal + Number(totals.withdrawal || 0) - Number(withdrawalManual.withdrawal || 0);
     const sendMoney = openings.sendMoney + Number(totals.sendMoney || 0) - Number(withdrawalManual.sendMoney || 0);
-
     return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
   }, [oneDay, openings, totals, withdrawalManual]);
 
@@ -406,10 +401,13 @@ export default function OverviewPage() {
         </div>
       </Section>
 
-      {/* Cashier */}
-      <Section title="Cashier" subtitle="Opening values are read from Cash page. Expected = Opening + Sales - Manual Withdrawals">
+      {/* Cashier (single day) */}
+      <Section
+        title="Cashier"
+        subtitle="Opening values are read from Cash page. Expected = Opening + Sales - Manual Withdrawals"
+      >
         {!oneDay && (
-          <div className="ui-card p-4 text-sm text-mute">Set From = To to view cashier balances.</div>
+          <div className="ui-card p-4 text-sm text-mute">Set Range to a single day (From = To) to show cashier balances.</div>
         )}
 
         {oneDay && (
@@ -439,6 +437,10 @@ export default function OverviewPage() {
               <Card title="Expected Withdrawal" value={K(cashierBalances.withdrawal)} subtitle={`- Withdrawals: ${K(withdrawalManual.withdrawal)}`} />
               <Card title="Expected Send Money" value={K(cashierBalances.sendMoney)} subtitle={`- Withdrawals: ${K(withdrawalManual.sendMoney)}`} />
               <Card title="Expected Total" value={K(cashierBalances.total)} subtitle="All methods" />
+            </div>
+
+            <div className="mt-4 ui-card p-4 text-sm text-mute">
+              To record manual withdrawals, go to <b>Summary</b> → <b>Manual Withdrawals</b>.
             </div>
           </>
         )}
