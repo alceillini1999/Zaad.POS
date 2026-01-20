@@ -32,12 +32,6 @@ const endOfDay = (d) => {
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
 const fmtD = (d) => new Date(d).toISOString().slice(0, 10);
 
-function getToken() {
-  try {
-    return localStorage.getItem("token") || "";
-  } catch {
-    return "";
-  }
 }
 
 function normPM(r) {
@@ -63,18 +57,6 @@ function srcLabel(src) {
   }
 }
 
-async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(input, { ...init, signal: ctrl.signal });
-    const data = await res.json().catch(() => ({}));
-    return { res, data };
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 export default function SummeryPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [fromDate, setFromDate] = useState(today);
@@ -88,9 +70,6 @@ export default function SummeryPage() {
   const [wAmount, setWAmount] = useState("");
   const [wSource, setWSource] = useState("cash");
   const [wReason, setWReason] = useState("");
-
-  const [openInfo, setOpenInfo] = useState(null);
-  const [openInfoStatus, setOpenInfoStatus] = useState("idle"); // idle | loading | ok | timeout | error
 
   useEffect(() => {
     (async () => {
@@ -139,84 +118,6 @@ export default function SummeryPage() {
     } catch {}
   }, [withdrawals, isSingleDay, dayKey]);
 
-  // Load opening values from Cash page / backend sheet (single day)
-  useEffect(() => {
-    if (!isSingleDay) {
-      setOpenInfo(null);
-      setOpenInfoStatus("idle");
-      return;
-    }
-
-    let cancelled = false;
-    const token = getToken();
-
-    // Immediate best-effort from localStorage dayOpen (often today)
-    try {
-      const raw = localStorage.getItem("dayOpen");
-      const d = raw ? JSON.parse(raw) : null;
-      if (d && String(d.date) === String(dayKey)) {
-        setOpenInfo({
-          found: true,
-          date: dayKey,
-          openId: d.openId || "",
-          openedAt: d.openedAt || "",
-          tillNo: d.tillNo || "",
-          openingCashTotal: Number(d.openingCashTotal || 0),
-          openingTillTotal: Number(d.openingTillTotal || 0),
-          withdrawalCash: Number(d.withdrawalCash ?? d.mpesaWithdrawal ?? 0),
-          sendMoney: Number(d.sendMoney || 0),
-        });
-      }
-    } catch {}
-
-    (async () => {
-      setOpenInfoStatus("loading");
-      try {
-        const { res, data } = await fetchJsonWithTimeout(
-          `/api/cash/today?date=${encodeURIComponent(dayKey)}`,
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            cache: "no-store",
-          },
-          2500
-        );
-
-        if (cancelled) return;
-
-        if (res.ok && data?.found && data?.row) {
-          const row = data.row;
-          setOpenInfo({
-            found: true,
-            date: dayKey,
-            openId: row.openId || row.openID || "",
-            openedAt: row.openedAt || "",
-            tillNo: String(row.tillNo || ""),
-            openingCashTotal: Number(row.openingCashTotal || 0),
-            openingTillTotal: Number(row.openingTillTotal || 0),
-            withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
-            sendMoney: Number(row.sendMoney || 0),
-          });
-          setOpenInfoStatus("ok");
-          return;
-        }
-
-        setOpenInfo(null);
-        setOpenInfoStatus("ok");
-      } catch (e) {
-        if (cancelled) return;
-        if (e?.name === "AbortError") {
-          setOpenInfoStatus("timeout");
-          return;
-        }
-        setOpenInfoStatus("error");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSingleDay, dayKey]);
-
   const totals = useMemo(() => {
     const inRange = (t) => {
       const d = new Date(t);
@@ -261,37 +162,6 @@ export default function SummeryPage() {
     return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
   }, [withdrawals]);
 
-  const openings = useMemo(() => {
-    if (!isSingleDay || !openInfo?.found) {
-      return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0 };
-    }
-    return {
-      cash: Number(openInfo.openingCashTotal || 0),
-      till: Number(openInfo.openingTillTotal || 0),
-      withdrawal: Number(openInfo.withdrawalCash || 0),
-      sendMoney: Number(openInfo.sendMoney || 0),
-    };
-  }, [isSingleDay, openInfo]);
-
-  const cashierBalances = useMemo(() => {
-    if (!isSingleDay) {
-      return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0, total: 0 };
-    }
-
-    const cash = openings.cash + Number(totals.cashSales || 0) - Number(withdrawalManual.cash || 0);
-    const till = openings.till + Number(totals.tillSales || 0) - Number(withdrawalManual.till || 0);
-    const withdrawal = openings.withdrawal + Number(totals.withdrawalSales || 0) - Number(withdrawalManual.withdrawal || 0);
-    const sendMoney = openings.sendMoney + Number(totals.sendMoneySales || 0) - Number(withdrawalManual.sendMoney || 0);
-
-    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
-  }, [isSingleDay, openings, totals, withdrawalManual]);
-
-  // POS withdrawals details (paymentMethod=withdrawal)
-  const posWithdrawals = useMemo(
-    () => totals.salesInRange.filter((r) => normPM(r) === "withdrawal"),
-    [totals.salesInRange]
-  );
-
   const addWithdrawal = () => {
     const n = Number(String(wAmount || "").replace(/,/g, ""));
     if (!Number.isFinite(n) || n <= 0) {
@@ -334,19 +204,12 @@ export default function SummeryPage() {
     },
   ];
 
-  const posWithdrawalColumns = [
-    { key: "createdAt", header: "Date", render: (r) => fmtD(r.createdAt) },
-    { key: "invoiceNo", header: "Invoice" },
-    { key: "clientName", header: "Client" },
-    { key: "total", header: "Total", render: (r) => K(r.total) },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="ui-h1">Summary</div>
-          <div className="ui-sub mt-1">Cashier + totals + withdrawals with details</div>
+          <div className="ui-sub mt-1">Totals + manual withdrawals with details</div>
         </div>
         <div className="ui-badge">
           Range: <b className="ml-1">{fromDate}</b> → <b>{toDate}</b>
@@ -368,7 +231,7 @@ export default function SummeryPage() {
             <div className="text-xs font-bold uppercase tracking-wider text-mute">Mode</div>
             <div className="mt-1 font-extrabold text-ink">{isSingleDay ? "Single Day" : "Range"}</div>
             <div className="ui-sub mt-1">
-              To manage cashier (opening + expected + manual withdrawals), set <b>From = To</b>.
+              Manual withdrawals work on a single day: set <b>From = To</b>.
             </div>
           </div>
         </div>
@@ -391,44 +254,6 @@ export default function SummeryPage() {
           <Card title="Withdrawal" value={K(totals.withdrawalSales)} />
           <Card title="Send Money" value={K(totals.sendMoneySales)} />
         </div>
-      </Section>
-
-      {/* Cashier */}
-      <Section title="Cashier" subtitle="Opening values are read from Cash page. Expected = Opening + Sales - Manual Withdrawals">
-        {!isSingleDay && (
-          <div className="ui-card p-4 text-sm text-mute">Set From = To to manage cashier balances.</div>
-        )}
-
-        {isSingleDay && (
-          <>
-            {(openInfoStatus === "timeout" || openInfoStatus === "error") && (
-              <div className="ui-card p-4 text-sm">
-                <b>Note:</b> Could not load opening values from the server ({openInfoStatus}). If your backend is on a free plan it may be sleeping.
-              </div>
-            )}
-
-            {!openInfo?.found && openInfoStatus === "ok" && (
-              <div className="ui-card p-4 text-sm">
-                <b>No Start Day found</b> for {dayKey}. Open the day from the <b>Cash</b> page first.
-              </div>
-            )}
-
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-              <Card title="Opening Cash" value={K(openings.cash)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
-              <Card title="Opening Till" value={K(openings.till)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
-              <Card title="Opening Withdrawal" value={K(openings.withdrawal)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
-              <Card title="Opening Send Money" value={K(openings.sendMoney)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
-            </div>
-
-            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-5">
-              <Card title="Expected Cash" value={K(cashierBalances.cash)} subtitle={`- Withdrawals: ${K(withdrawalManual.cash)}`} />
-              <Card title="Expected Till" value={K(cashierBalances.till)} subtitle={`- Withdrawals: ${K(withdrawalManual.till)}`} />
-              <Card title="Expected Withdrawal" value={K(cashierBalances.withdrawal)} subtitle={`- Withdrawals: ${K(withdrawalManual.withdrawal)}`} />
-              <Card title="Expected Send Money" value={K(cashierBalances.sendMoney)} subtitle={`- Withdrawals: ${K(withdrawalManual.sendMoney)}`} />
-              <Card title="Expected Total" value={K(cashierBalances.total)} subtitle="All methods" />
-            </div>
-          </>
-        )}
       </Section>
 
       {/* Manual withdrawals */}
@@ -478,11 +303,6 @@ export default function SummeryPage() {
             </div>
           </>
         )}
-      </Section>
-
-      {/* POS payment-method: Withdrawal */}
-      <Section title="Withdrawals" subtitle="Sales recorded with paymentMethod = withdrawal (this is a payment method)">
-        <Table columns={posWithdrawalColumns} data={posWithdrawals} keyField="invoiceNo" emptyText="No withdrawals" />
       </Section>
     </div>
   );

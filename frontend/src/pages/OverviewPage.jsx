@@ -43,6 +43,27 @@ const endOfDay = (d) => {
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
 const fmtD = (d) => new Date(d).toISOString().slice(0, 10);
 
+function getToken() {
+  try {
+    return localStorage.getItem("token") || "";
+  } catch {
+    return "";
+  }
+}
+
+async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(input, { ...init, signal: ctrl.signal });
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+
 function StatIcon({ children }) {
   return <span className="h-6 w-6 text-ink/70">{children}</span>;
 }
@@ -54,6 +75,11 @@ export default function OverviewPage() {
 
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
+
+  // Cashier (single day)
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [openInfo, setOpenInfo] = useState(null);
+  const [openInfoStatus, setOpenInfoStatus] = useState("idle"); // idle | loading | ok | timeout | error
 
   useEffect(() => {
     (async () => {
@@ -73,6 +99,101 @@ export default function OverviewPage() {
   const dFrom = useMemo(() => startOfDay(new Date(fromDate)), [fromDate]);
   const dTo = useMemo(() => endOfDay(new Date(toDate)), [toDate]);
   const oneDay = useMemo(() => sameDay(dFrom, dTo), [dFrom, dTo]);
+  const dayKey = useMemo(() => fmtD(dFrom), [dFrom]);
+
+  // Load manual withdrawals from localStorage (single day)
+  const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
+  useEffect(() => {
+    if (!oneDay) {
+      setWithdrawals([]);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(lsKey("withdrawals", dayKey));
+      const list = raw ? JSON.parse(raw) : [];
+      setWithdrawals(Array.isArray(list) ? list : []);
+    } catch {
+      setWithdrawals([]);
+    }
+  }, [oneDay, dayKey]);
+
+  // Load opening values from Cash page / backend sheet (single day)
+  useEffect(() => {
+    if (!oneDay) {
+      setOpenInfo(null);
+      setOpenInfoStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    const token = getToken();
+
+    // Best-effort from localStorage dayOpen (often today)
+    try {
+      const raw = localStorage.getItem("dayOpen");
+      const d = raw ? JSON.parse(raw) : null;
+      if (d && String(d.date) === String(dayKey)) {
+        setOpenInfo({
+          found: true,
+          date: dayKey,
+          openId: d.openId || "",
+          openedAt: d.openedAt || "",
+          tillNo: d.tillNo || "",
+          openingCashTotal: Number(d.openingCashTotal || 0),
+          openingTillTotal: Number(d.openingTillTotal || 0),
+          withdrawalCash: Number(d.withdrawalCash ?? d.mpesaWithdrawal ?? 0),
+          sendMoney: Number(d.sendMoney || 0),
+        });
+      }
+    } catch {}
+
+    (async () => {
+      setOpenInfoStatus("loading");
+      try {
+        const { res, data } = await fetchJsonWithTimeout(
+          `/api/cash/today?date=${encodeURIComponent(dayKey)}`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            cache: "no-store",
+          },
+          2500
+        );
+
+        if (cancelled) return;
+
+        if (res.ok && data?.found && data?.row) {
+          const row = data.row;
+          setOpenInfo({
+            found: true,
+            date: dayKey,
+            openId: row.openId || row.openID || "",
+            openedAt: row.openedAt || "",
+            tillNo: String(row.tillNo || ""),
+            openingCashTotal: Number(row.openingCashTotal || 0),
+            openingTillTotal: Number(row.openingTillTotal || 0),
+            withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
+            sendMoney: Number(row.sendMoney || 0),
+          });
+          setOpenInfoStatus("ok");
+          return;
+        }
+
+        setOpenInfo(null);
+        setOpenInfoStatus("ok");
+      } catch (e) {
+        if (cancelled) return;
+        if (e?.name === "AbortError") {
+          setOpenInfoStatus("timeout");
+          return;
+        }
+        setOpenInfoStatus("error");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [oneDay, dayKey]);
 
   const totals = useMemo(() => {
     const inRange = (t) => {
@@ -112,6 +233,44 @@ export default function OverviewPage() {
       sendMoney,
     };
   }, [sales, expenses, dFrom, dTo]);
+
+
+  const withdrawalManual = useMemo(() => {
+    const sum = (src) =>
+      withdrawals
+        .filter((w) => w.source === src)
+        .reduce((s, w) => s + Number(w.amount || 0), 0);
+    const cash = sum("cash");
+    const till = sum("till");
+    const withdrawal = sum("withdrawal");
+    const sendMoney = sum("send_money");
+    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
+  }, [withdrawals]);
+
+  const openings = useMemo(() => {
+    if (!oneDay || !openInfo?.found) {
+      return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0 };
+    }
+    return {
+      cash: Number(openInfo.openingCashTotal || 0),
+      till: Number(openInfo.openingTillTotal || 0),
+      withdrawal: Number(openInfo.withdrawalCash || 0),
+      sendMoney: Number(openInfo.sendMoney || 0),
+    };
+  }, [oneDay, openInfo]);
+
+  const cashierBalances = useMemo(() => {
+    if (!oneDay) {
+      return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0, total: 0 };
+    }
+
+    const cash = openings.cash + Number(totals.cash || 0) - Number(withdrawalManual.cash || 0);
+    const till = openings.till + Number(totals.till || 0) - Number(withdrawalManual.till || 0);
+    const withdrawal = openings.withdrawal + Number(totals.withdrawal || 0) - Number(withdrawalManual.withdrawal || 0);
+    const sendMoney = openings.sendMoney + Number(totals.sendMoney || 0) - Number(withdrawalManual.sendMoney || 0);
+
+    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
+  }, [oneDay, openings, totals, withdrawalManual]);
 
   const chartData = useMemo(() => {
     const inRange = (t) => {
@@ -245,6 +404,44 @@ export default function OverviewPage() {
           <Card title="Withdrawal" value={K(totals.withdrawal)} subtitle="Paid via Withdrawal" />
           <Card title="Send Money" value={K(totals.sendMoney)} subtitle="Paid via Send Money" />
         </div>
+      </Section>
+
+      {/* Cashier */}
+      <Section title="Cashier" subtitle="Opening values are read from Cash page. Expected = Opening + Sales - Manual Withdrawals">
+        {!oneDay && (
+          <div className="ui-card p-4 text-sm text-mute">Set From = To to view cashier balances.</div>
+        )}
+
+        {oneDay && (
+          <>
+            {(openInfoStatus === "timeout" || openInfoStatus === "error") && (
+              <div className="ui-card p-4 text-sm">
+                <b>Note:</b> Could not load opening values from the server ({openInfoStatus}). If your backend is on a free plan it may be sleeping.
+              </div>
+            )}
+
+            {!openInfo?.found && openInfoStatus === "ok" && (
+              <div className="ui-card p-4 text-sm">
+                <b>No Start Day found</b> for {dayKey}. Open the day from the <b>Cash</b> page first.
+              </div>
+            )}
+
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+              <Card title="Opening Cash" value={K(openings.cash)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
+              <Card title="Opening Till" value={K(openings.till)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
+              <Card title="Opening Withdrawal" value={K(openings.withdrawal)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
+              <Card title="Opening Send Money" value={K(openings.sendMoney)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
+            </div>
+
+            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-5">
+              <Card title="Expected Cash" value={K(cashierBalances.cash)} subtitle={`- Withdrawals: ${K(withdrawalManual.cash)}`} />
+              <Card title="Expected Till" value={K(cashierBalances.till)} subtitle={`- Withdrawals: ${K(withdrawalManual.till)}`} />
+              <Card title="Expected Withdrawal" value={K(cashierBalances.withdrawal)} subtitle={`- Withdrawals: ${K(withdrawalManual.withdrawal)}`} />
+              <Card title="Expected Send Money" value={K(cashierBalances.sendMoney)} subtitle={`- Withdrawals: ${K(withdrawalManual.sendMoney)}`} />
+              <Card title="Expected Total" value={K(cashierBalances.total)} subtitle="All methods" />
+            </div>
+          </>
+        )}
       </Section>
 
       {/* Chart */}
