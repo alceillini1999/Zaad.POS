@@ -64,7 +64,7 @@ export default function POSPage() {
   const [cart, setCart] = useState([]);
   const [client, setClient] = useState(null);
 
-  // طرق الدفع: cash / till / withdrawal / send_money
+  // طرق الدفع: cash / till / withdrawal
   const [payment, setPayment] = useState("cash");
 
   // خصم + نقاط + مستلم/باقي
@@ -282,7 +282,6 @@ export default function POSPage() {
                     <option value="cash">Cash</option>
                     <option value="till">Till</option>
                     <option value="withdrawal">Withdrawal</option>
-                    <option value="send_money">Send Money</option>
                   </select>
                 </label>
               </div>

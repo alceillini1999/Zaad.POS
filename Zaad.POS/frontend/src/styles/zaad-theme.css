@@ -1,0 +1,139 @@
+/* نطاق الثيم */
+.theme-zaad {
+  --bg: #0B0F14;
+  --bg-soft: #0E1319;
+  --card: rgba(18,22,28,.78);
+  --card-strong: rgba(18,22,28,.92);
+  --border: rgba(255,255,255,.06);
+  --line: rgba(255,255,255,.08);
+  --text: #ffffff;
+  --text-dim: #d1d5db;
+  --muted: #9ca3af;
+  --gold: #F2C041;
+  --brown: #8B5E3C;
+  color: var(--text);
+}
+
+/* اجعل html/body/root شفافة لأن الخلفية تُرسم بواسطة AppBackground */
+html, body, #root { background: transparent !important; }
+
+/* أي عناصر شائعة قد تفرض الأبيض */
+.theme-zaad .bg-white,
+.theme-zaad [class*="bg-white"],
+.theme-zaad [style*="background: white"],
+.theme-zaad [style*="background-color: white"],
+.theme-zaad .bg-light,
+.theme-zaad .white-bg {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* رأس الصفحة */
+.theme-zaad header,
+.theme-zaad .topbar,
+.theme-zaad .navbar,
+.theme-zaad #topbar {
+  background: linear-gradient(180deg, rgba(242,192,65,0.20), rgba(242,192,65,0.06) 32%, transparent) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* الشريط الأيسر */
+.theme-zaad aside,
+.theme-zaad .sidebar,
+.theme-zaad .sidenav,
+.theme-zaad #sidebar {
+  background: linear-gradient(180deg, rgba(26,18,11,0.92), rgba(18,22,28,0.95)),
+              radial-gradient(circle at top left, rgba(242,192,65,0.15), transparent 70%);
+  background-blend-mode: screen;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  box-shadow:
+    inset 0 0 24px rgba(242,192,65,0.10),
+    inset 0 0 60px rgba(0,0,0,0.25);
+  color: #fff !important;
+  backdrop-filter: blur(10px);
+}
+
+/* روابط الشريط الأيسر */
+.theme-zaad aside a,
+.theme-zaad .sidebar a,
+.theme-zaad .sidenav a,
+.theme-zaad #sidebar a {
+  color: #ffffffcc;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-zaad aside a.active,
+.theme-zaad .sidebar a.active,
+.theme-zaad .sidenav a.active,
+.theme-zaad #sidebar a.active,
+.theme-zaad a.router-link-active,
+.theme-zaad a[aria-current="page"] {
+  color: #0B0F14 !important;
+  background: linear-gradient(135deg, var(--gold), var(--brown)) !important;
+  box-shadow: 0 0 18px rgba(242,192,65,.25), inset 0 0 1px rgba(255,255,255,.35);
+  border-color: transparent !important;
+}
+
+/* البطاقات/الأقسام */
+.theme-zaad .card,
+.theme-zaad .panel,
+.theme-zaad .widget,
+.theme-zaad .bg-elev,
+.theme-zaad main .rounded,
+.theme-zaad main .rounded-lg,
+.theme-zaad main .rounded-xl,
+.theme-zaad main .rounded-2xl,
+.theme-zaad .container-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* الجداول */
+.theme-zaad table { width: 100%; border-collapse: collapse; color: var(--text); }
+.theme-zaad thead th { background: var(--card-strong); color: var(--text); border-bottom: 1px solid var(--line); font-weight: 600; }
+.theme-zaad tbody tr { border-bottom: 1px solid var(--line); }
+.theme-zaad tbody tr:hover { background: rgba(255,255,255,0.03); }
+.theme-zaad td, .theme-zaad th { padding: 10px 12px; }
+
+/* النماذج */
+.theme-zaad input,
+.theme-zaad select,
+.theme-zaad textarea {
+  background: var(--bg-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.theme-zaad input::placeholder,
+.theme-zaad textarea::placeholder { color: #ffffff66; }
+
+/* الأزرار */
+.theme-zaad button,
+.theme-zaad .btn {
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: all .2s ease;
+}
+.theme-zaad .btn:hover, .theme-zaad button:hover { filter: brightness(1.06); }
+
+/* زر أساسي ذهبي */
+.theme-zaad .btn-primary,
+.theme-zaad button.primary,
+.theme-zaad .btn--primary {
+  color: #0B0F14 !important;
+  background: linear-gradient(135deg, var(--gold), var(--brown)) !important;
+  box-shadow: 0 0 22px rgba(242,192,65,.35), inset 0 0 1px rgba(255,255,255,.35);
+  border: none !important;
+}

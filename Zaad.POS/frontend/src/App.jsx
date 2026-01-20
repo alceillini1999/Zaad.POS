@@ -307,13 +307,13 @@ function CashPage() {
     setOk('')
     if (isOpenedToday && dayOpenState?.tillNo) setTillNo(String(dayOpenState.tillNo))
     if (isOpenedToday) {
-      setTillTotal(String(dayOpenState?.openingTillTotal ?? 0))
       setWithdrawalCash(String(dayOpenState?.withdrawalCash ?? dayOpenState?.mpesaWithdrawal ?? 0))
       setSendMoney(String(dayOpenState?.sendMoney ?? 0))
+      setTillTotal(String(dayOpenState?.openingTillTotal ?? 0))
     } else {
-      setTillTotal('0')
       setWithdrawalCash('0')
       setSendMoney('0')
+      setTillTotal('0')
     }
   }, [isOpenedToday]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -349,21 +349,21 @@ function CashPage() {
       if (totalCash === null) throw new Error('Please enter valid whole numbers for cash counts.')
       if (!tillNo.trim()) throw new Error('Till Number is required.')
 
-      const tillNum = parseNonNegNumber(tillTotal)
-      if (tillNum === null) throw new Error('Till Amount must be a non-negative number.')
-
       const withdrawalNum = parseNonNegNumber(withdrawalCash)
       if (withdrawalNum === null) throw new Error('Withdrawal Cash must be a non-negative number.')
 
       const sendMoneyNum = parseNonNegNumber(sendMoney)
       if (sendMoneyNum === null) throw new Error('Send Money must be a non-negative number.')
 
+      const tillNum = parseNonNegNumber(tillTotal)
+      if (tillNum === null) throw new Error('Till Total must be a non-negative number.')
+
       const payload = {
         date: today,
         openingCashTotal: totalCash,
-        openingTillTotal: tillNum,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
+        openingTillTotal: tillNum,
         // Back-compat: backend currently reads mpesaWithdrawal. We also send a clearer name.
         mpesaWithdrawal: withdrawalNum,
         withdrawalCash: withdrawalNum,
@@ -458,13 +458,16 @@ function CashPage() {
       const sendMoneyNum = parseNonNegNumber(sendMoney)
       if (sendMoneyNum === null) throw new Error('Send Money must be a non-negative number.')
 
+      const tillNum = parseNonNegNumber(tillTotal)
+      if (tillNum === null) throw new Error('Till Total must be a non-negative number.')
+
       const payload = {
         date: today,
         openId: dayOpenState?.openId || null,
         closingCashTotal: totalCash,
-        closingTillTotal: tillNum,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
+        closingTillTotal: tillNum,
         mpesaWithdrawal: withdrawalNum,
         withdrawalCash: withdrawalNum,
         sendMoney: sendMoneyNum,
@@ -518,7 +521,8 @@ function CashPage() {
 
       {isOpenedToday && (
         <div className="text-sm opacity-80 mb-3">
-          Morning cash recorded: <b>KSh {Number(dayOpenState?.openingCashTotal || 0)}</b>
+          Morning cash recorded: <b>KSh {Number(dayOpenState?.openingCashTotal || 0)}</b> · Morning till recorded:{' '}
+          <b>KSh {Number(dayOpenState?.openingTillTotal || 0)}</b>
         </div>
       )}
 
@@ -563,7 +567,9 @@ function CashPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-1">Till Amount (KSh)</label>
+              <label className="block text-sm font-semibold mb-1">
+                {isOpenedToday ? 'Closing Till Total (KSh)' : 'Opening Till Total (KSh)'}
+              </label>
               <input
                 value={tillTotal}
                 onChange={(e) => setTillTotal(e.target.value)}
@@ -855,30 +861,24 @@ function EndDayFloatingControl() {
 function RoutedPages() {
   const location = useLocation()
 
-  // Keep backend warm (helps when hosting on free tiers that sleep after inactivity).
+  // Keep backend warm so the app doesn't appear to "sleep" after idle time
   useEffect(() => {
-    const ping = () => {
-      const token = getToken()
-      if (!token) return
-      fetch('/api/healthz', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      }).catch(() => {})
-    }
-
-    const onFocus = () => ping()
-    const onVis = () => {
-      if (!document.hidden) ping()
+    let timer = null
+    const ping = async () => {
+      try {
+        await fetch('/api/healthz', {
+          headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+          cache: 'no-store',
+        })
+      } catch {
+        // ignore
+      }
     }
 
     ping()
-    const id = setInterval(ping, 8 * 60 * 1000)
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVis)
+    timer = setInterval(ping, 4 * 60 * 1000)
     return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVis)
+      if (timer) clearInterval(timer)
     }
   }, [])
 
