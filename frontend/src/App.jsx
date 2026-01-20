@@ -104,9 +104,76 @@ function PageWrapper({ children }) {
    Day Open Gate
 ====================== */
 function DayOpenedRoute({ children }) {
-  const today = getLocalDateISO()
-  const day = getDayOpen()
-  if (!day || day.date !== today) return <Navigate to="/cash" replace />
+  const location = useLocation()
+  const [status, setStatus] = useState('checking')
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function check() {
+      const today = getLocalDateISO()
+      const day = getDayOpen()
+
+      if (day && day.date === today) {
+        if (!cancelled) setStatus('ok')
+        return
+      }
+
+      try {
+        const r = await fetch(`/api/cash/today?date=${encodeURIComponent(today)}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+          cache: 'no-store',
+        })
+
+        const data = await r.json().catch(() => ({}))
+
+        if (r.status === 401 || r.status === 403) {
+          clearSession()
+          if (!cancelled) setStatus('login')
+          return
+        }
+
+        if (r.ok && data?.found && data?.row) {
+          const row = data.row
+          const loaded = {
+            date: today,
+            openId: row.openId || row.openID || '',
+            openedAt: row.openedAt || '',
+            openingCashTotal: Number(row.openingCashTotal || 0),
+            cashBreakdown: Array.isArray(row.cashBreakdown) ? row.cashBreakdown : [],
+            tillNo: String(row.tillNo || ''),
+            mpesaWithdrawal: Number(row.mpesaWithdrawal || 0),
+            withdrawalCash: Number(row.mpesaWithdrawal || 0),
+            sendMoney: Number(row.sendMoney || 0),
+          }
+          setDayOpen(loaded)
+          if (!cancelled) setStatus('ok')
+          return
+        }
+
+        if (!cancelled) setStatus('cash')
+      } catch (e) {
+        // If API is unavailable, fall back to cash page
+        if (!cancelled) setStatus('cash')
+      }
+    }
+
+    check()
+    return () => {
+      cancelled = true
+    }
+  }, [location.pathname])
+
+  if (status === 'checking') {
+    return (
+      <div className="p-6">
+        <div className="ui-card p-4">Checking today's cash session…</div>
+      </div>
+    )
+  }
+  if (status === 'login') return <Navigate to="/login" replace />
+  if (status === 'cash') return <Navigate to="/cash" replace />
+
   return children
 }
 
@@ -148,7 +215,6 @@ function parseNonNegNumber(v) {
    - End Day: enter evening cash + Save & logout
 ====================== */
 function CashPage() {
-  const nav = useNavigate()
 
   const token = getToken()
   if (!token) return <Navigate to="/login" replace />
@@ -171,6 +237,46 @@ function CashPage() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
+
+  // If localStorage was cleared, but the day is already opened in backend, load it automatically
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadOpenedDay() {
+      if (isOpenedToday) return
+      try {
+        const r = await fetch(`/api/cash/today?date=${encodeURIComponent(today)}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+          cache: 'no-store',
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || !data?.found || !data?.row) return
+
+        const row = data.row
+        const loaded = {
+          date: today,
+          openId: row.openId || row.openID || '',
+          openedAt: row.openedAt || '',
+          openingCashTotal: Number(row.openingCashTotal || 0),
+          cashBreakdown: Array.isArray(row.cashBreakdown) ? row.cashBreakdown : [],
+          tillNo: String(row.tillNo || ''),
+          mpesaWithdrawal: Number(row.mpesaWithdrawal || 0),
+          withdrawalCash: Number(row.mpesaWithdrawal || 0),
+          sendMoney: Number(row.sendMoney || 0),
+        }
+
+        setDayOpen(loaded)
+        if (!cancelled) setDayOpenState(loaded)
+      } catch {
+        // ignore
+      }
+    }
+
+    loadOpenedDay()
+    return () => {
+      cancelled = true
+    }
+  }, [today])
 
   // Reset form when switching between "Start Day" and "End Day"
   useEffect(() => {
@@ -249,7 +355,37 @@ function CashPage() {
       })
 
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data?.error || 'Failed to save Start Day.')
+      if (!r.ok) {
+        // If the day is already opened, load it from backend and switch UI to End Day
+        if (r.status === 409) {
+          try {
+            const rr = await fetch(`/api/cash/today?date=${encodeURIComponent(today)}`, {
+              headers: { Authorization: `Bearer ${getToken()}` },
+              cache: 'no-store',
+            })
+            const dd = await rr.json().catch(() => ({}))
+            if (rr.ok && dd?.found && dd?.row) {
+              const row = dd.row
+              const loaded = {
+                date: today,
+                openId: row.openId || row.openID || data?.openId || '',
+                openedAt: row.openedAt || '',
+                openingCashTotal: Number(row.openingCashTotal || 0),
+                cashBreakdown: Array.isArray(row.cashBreakdown) ? row.cashBreakdown : [],
+                tillNo: String(row.tillNo || ''),
+                mpesaWithdrawal: Number(row.mpesaWithdrawal || 0),
+                withdrawalCash: Number(row.mpesaWithdrawal || 0),
+                sendMoney: Number(row.sendMoney || 0),
+              }
+              setDayOpen(loaded)
+              setDayOpenState(loaded)
+              setOk('Start Day already saved for today. Loaded existing record.')
+              return
+            }
+          } catch {}
+        }
+        throw new Error(data?.error || 'Failed to save Start Day.')
+      }
 
       const newDay = {
         date: today,
@@ -457,7 +593,6 @@ function CashPage() {
    (no longer used since we removed floating button)
 ====================== */
 function EndDayModal({ open, onClose }) {
-  const nav = useNavigate()
 
   const [counts, setCounts] = useState(buildInitialCounts())
   const [tillNo, setTillNo] = useState('')

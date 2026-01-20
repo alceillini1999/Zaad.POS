@@ -18,7 +18,46 @@ const DEFAULT_TILL_NO = process.env.DEFAULT_TILL_NO || 'TILL-1';
 function normalizeDate(v) {
   if (v == null) return '';
   const s = String(v).trim();
+  if (!s) return '';
+
+  // YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // YYYY/M/D or YYYY-M-D
+  let m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (Number.isFinite(dt.getTime())) return dt.toISOString().slice(0, 10);
+  }
+
+  // D/M/YYYY or M/D/YYYY (also supports D-M-YYYY / M-D-YYYY)
+  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    const y = Number(m[3]);
+
+    let day, month;
+    // If one side is >12, we can disambiguate
+    if (a > 12 && b <= 12) {
+      day = a;
+      month = b;
+    } else if (b > 12 && a <= 12) {
+      month = a;
+      day = b;
+    } else {
+      // Ambiguous: default to D/M/YYYY (common locale for many non-US sheets)
+      day = a;
+      month = b;
+    }
+
+    const dt = new Date(Date.UTC(y, month - 1, day));
+    if (Number.isFinite(dt.getTime())) return dt.toISOString().slice(0, 10);
+  }
+
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return '';
   return d.toISOString().slice(0, 10);
@@ -72,7 +111,7 @@ async function getYesterdayClosing(date) {
 // Find open row for date
 async function findOpenRow(date) {
   const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
-  const found = (rows || []).find(r => String(r[0] || '') === date);
+  const found = (rows || []).find(r => normalizeDate(r[0]) === date);
   return { rows, found };
 }
 
@@ -119,7 +158,7 @@ router.get('/today', async (req, res) => {
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
     const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
 
-    const found = (rows || []).find(r => String(r[0] || '') === date);
+    const found = (rows || []).find(r => normalizeDate(r[0]) === date);
     if (!found) return res.json({ ok: true, found: false });
 
     return res.json({
@@ -249,7 +288,7 @@ router.post('/open', async (req, res) => {
 
     // prevent duplicate open for same date
     const existing = await readRows(SHEET_ID, OPEN_TAB, 'A2:B');
-    const already = (existing || []).find(r => String(r[0] || '') === date);
+    const already = (existing || []).find(r => normalizeDate(r[0]) === date);
     if (already) {
       return res.status(409).json({ error: 'Day already opened for this date', openId: already[1] || '' });
     }

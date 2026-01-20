@@ -77,7 +77,6 @@ export default function Login() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. ahmed"
                 autoComplete="username"
                 className="ui-input mt-1"
               />
@@ -90,7 +89,6 @@ export default function Login() {
                 inputMode="numeric"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="e.g. 1999"
                 autoComplete="current-password"
                 className="ui-input mt-1"
               />
