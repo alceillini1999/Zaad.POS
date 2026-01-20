@@ -30,7 +30,46 @@ const endOfDay = (d) => {
   return x;
 };
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
-const fmtD = (d) => new Date(d).toISOString().slice(0, 10);
+
+// IMPORTANT:
+// Use *local* calendar date (NOT UTC). Using toISOString().slice(0,10) can shift the day depending on timezone.
+const toLocalYMD = (d) => {
+  const x = new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const day = String(x.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const parseYMDLocal = (s) => {
+  const [y, m, d] = String(s || "")
+    .split("-")
+    .map((v) => parseInt(v, 10));
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d);
+};
+
+const fmtD = (d) => toLocalYMD(d);
+
+function getToken() {
+  try {
+    return localStorage.getItem("token") || "";
+  } catch {
+    return "";
+  }
+}
+
+async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(input, { ...init, signal: ctrl.signal });
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 function normPM(r) {
   const raw = String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
@@ -56,12 +95,16 @@ function srcLabel(src) {
 }
 
 export default function SummeryPage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalYMD(new Date());
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
 
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
+
+  // Cashier opening values (single day)
+  const [openInfo, setOpenInfo] = useState(null);
+  const [openInfoStatus, setOpenInfoStatus] = useState("idle"); // idle | loading | ok | timeout | error
 
   // Manual withdrawals with details (single day)
   const [withdrawals, setWithdrawals] = useState([]);
@@ -88,8 +131,8 @@ export default function SummeryPage() {
     })();
   }, []);
 
-  const dFrom = useMemo(() => startOfDay(new Date(fromDate)), [fromDate]);
-  const dTo = useMemo(() => endOfDay(new Date(toDate)), [toDate]);
+  const dFrom = useMemo(() => startOfDay(parseYMDLocal(fromDate)), [fromDate]);
+  const dTo = useMemo(() => endOfDay(parseYMDLocal(toDate)), [toDate]);
   const isSingleDay = useMemo(() => sameDay(dFrom, dTo), [dFrom, dTo]);
   const dayKey = useMemo(() => fmtD(dFrom), [dFrom]);
 
@@ -115,6 +158,85 @@ export default function SummeryPage() {
       localStorage.setItem(lsKey("withdrawals", dayKey), JSON.stringify(withdrawals || []));
     } catch {}
   }, [withdrawals, isSingleDay, dayKey]);
+
+  // Load opening values from Cash page / backend sheet (single day)
+  useEffect(() => {
+    if (!isSingleDay) {
+      setOpenInfo(null);
+      setOpenInfoStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    const token = getToken();
+
+    // Immediate best-effort from localStorage dayOpen
+    try {
+      const raw = localStorage.getItem("dayOpen");
+      const d = raw ? JSON.parse(raw) : null;
+      if (d && String(d.date) === String(dayKey)) {
+        setOpenInfo({
+          found: true,
+          date: dayKey,
+          openId: d.openId || "",
+          openedAt: d.openedAt || "",
+          tillNo: d.tillNo || "",
+          openingCashTotal: Number(d.openingCashTotal || 0),
+          openingTillTotal: Number(d.openingTillTotal || 0),
+          withdrawalCash: Number(d.withdrawalCash ?? d.mpesaWithdrawal ?? 0),
+          sendMoney: Number(d.sendMoney || 0),
+        });
+      }
+    } catch {}
+
+    (async () => {
+      setOpenInfoStatus("loading");
+      try {
+        const { res, data } = await fetchJsonWithTimeout(
+          url(`/api/cash/today?date=${encodeURIComponent(dayKey)}`),
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            cache: "no-store",
+            credentials: "include",
+          },
+          2500
+        );
+
+        if (cancelled) return;
+
+        if (res.ok && data?.found && data?.row) {
+          const row = data.row;
+          setOpenInfo({
+            found: true,
+            date: dayKey,
+            openId: row.openId || row.openID || "",
+            openedAt: row.openedAt || "",
+            tillNo: String(row.tillNo || ""),
+            openingCashTotal: Number(row.openingCashTotal || 0),
+            openingTillTotal: Number(row.openingTillTotal || 0),
+            withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
+            sendMoney: Number(row.sendMoney || 0),
+          });
+          setOpenInfoStatus("ok");
+          return;
+        }
+
+        setOpenInfo(null);
+        setOpenInfoStatus("ok");
+      } catch (e) {
+        if (cancelled) return;
+        if (e?.name === "AbortError") {
+          setOpenInfoStatus("timeout");
+          return;
+        }
+        setOpenInfoStatus("error");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSingleDay, dayKey]);
 
   const totals = useMemo(() => {
     const inRange = (t) => {
@@ -159,6 +281,52 @@ export default function SummeryPage() {
     const sendMoney = sum("send_money");
     return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
   }, [withdrawals]);
+
+  const openings = useMemo(() => {
+    if (!isSingleDay || !openInfo?.found) return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0 };
+    return {
+      cash: Number(openInfo.openingCashTotal || 0),
+      till: Number(openInfo.openingTillTotal || 0),
+      withdrawal: Number(openInfo.withdrawalCash || 0),
+      sendMoney: Number(openInfo.sendMoney || 0),
+    };
+  }, [isSingleDay, openInfo]);
+
+  // Expected available (Opening + Sales - Manual Withdrawals)
+  const expectedAvailable = useMemo(() => {
+    if (!isSingleDay) return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0, total: 0 };
+    const cash = openings.cash + Number(totals.cashSales || 0) - Number(withdrawalManual.cash || 0);
+    const till = openings.till + Number(totals.tillSales || 0) - Number(withdrawalManual.till || 0);
+    const withdrawal = openings.withdrawal + Number(totals.withdrawalSales || 0) - Number(withdrawalManual.withdrawal || 0);
+    const sendMoney = openings.sendMoney + Number(totals.sendMoneySales || 0) - Number(withdrawalManual.sendMoney || 0);
+    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
+  }, [isSingleDay, openings, totals, withdrawalManual]);
+
+  const projectedRemaining = useMemo(() => {
+    if (!isSingleDay) return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0, total: 0 };
+    const n = Number(String(wAmount || "").replace(/,/g, ""));
+    const dec = Number.isFinite(n) && n > 0 ? n : 0;
+    const next = {
+      cash: expectedAvailable.cash,
+      till: expectedAvailable.till,
+      withdrawal: expectedAvailable.withdrawal,
+      sendMoney: expectedAvailable.sendMoney,
+    };
+    if (wSource === "cash") next.cash -= dec;
+    if (wSource === "till") next.till -= dec;
+    if (wSource === "withdrawal") next.withdrawal -= dec;
+    if (wSource === "send_money") next.sendMoney -= dec;
+
+    // avoid showing negative balances
+    next.cash = Math.max(0, next.cash);
+    next.till = Math.max(0, next.till);
+    next.withdrawal = Math.max(0, next.withdrawal);
+    next.sendMoney = Math.max(0, next.sendMoney);
+    return {
+      ...next,
+      total: next.cash + next.till + next.withdrawal + next.sendMoney,
+    };
+  }, [isSingleDay, expectedAvailable, wAmount, wSource]);
 
   const addWithdrawal = () => {
     const n = Number(String(wAmount || "").replace(/,/g, ""));
@@ -262,6 +430,22 @@ export default function SummeryPage() {
 
         {isSingleDay && (
           <>
+            {(openInfoStatus === "timeout" || openInfoStatus === "error") && (
+              <div className="ui-card p-4 text-sm text-mute">
+                <b>Note:</b> Could not load opening values from the server ({openInfoStatus}). Expected balances may show 0 for opening amounts.
+              </div>
+            )}
+
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+              <Card title="Expected Available (Cash)" value={K(expectedAvailable.cash)} subtitle="Opening + Sales - Manual" />
+              <Card title="Expected Available (Till)" value={K(expectedAvailable.till)} subtitle="Opening + Sales - Manual" />
+              <Card title="Expected Available (Withdrawal)" value={K(expectedAvailable.withdrawal)} subtitle="Opening + Sales - Manual" />
+              <Card title="Expected Available (Send Money)" value={K(expectedAvailable.sendMoney)} subtitle="Opening + Sales - Manual" />
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="ui-badge">Total Expected: <b className="ml-1">{K(expectedAvailable.total)}</b></div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <label className="block">
                 <span className="ui-label">Amount</span>
@@ -280,6 +464,16 @@ export default function SummeryPage() {
                 <span className="ui-label">Reason</span>
                 <input className="ui-input mt-1" value={wReason} onChange={(e) => setWReason(e.target.value)} placeholder="e.g. supplier payment" />
               </label>
+            </div>
+
+            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-4">
+              <Card title="Remaining After Entry (Cash)" value={K(projectedRemaining.cash)} subtitle="If you add this withdrawal" />
+              <Card title="Remaining After Entry (Till)" value={K(projectedRemaining.till)} subtitle="If you add this withdrawal" />
+              <Card title="Remaining After Entry (Withdrawal)" value={K(projectedRemaining.withdrawal)} subtitle="If you add this withdrawal" />
+              <Card title="Remaining After Entry (Send Money)" value={K(projectedRemaining.sendMoney)} subtitle="If you add this withdrawal" />
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="ui-badge">Total Remaining: <b className="ml-1">{K(projectedRemaining.total)}</b></div>
             </div>
 
             <div className="mt-3 flex items-center gap-2">
