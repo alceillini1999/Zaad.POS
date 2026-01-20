@@ -18,6 +18,7 @@ const url = (p) => {
 const K = (n) =>
   `KSh ${Number(n || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`;
 
+// helpers
 const startOfDay = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -30,21 +31,47 @@ const endOfDay = (d) => {
 };
 const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
 const fmtD = (d) => new Date(d).toISOString().slice(0, 10);
-const fmtT = (d) =>
-  new Date(d).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" });
 
-const normPM = (r) =>
-  String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
-
-function lsKey(prefix, day) {
-  return `zaad_${prefix}_${day}`;
+function getToken() {
+  try {
+    return localStorage.getItem("token") || "";
+  } catch {
+    return "";
+  }
 }
 
-function readDayOpen() {
+function normPM(r) {
+  const raw = String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
+  const s = raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (s === "send money" || s === "sendmoney" || s === "send") return "send_money";
+  if (s === "withdrawel") return "withdrawal"; // common misspelling
+  return s;
+}
+
+function srcLabel(src) {
+  switch (src) {
+    case "cash":
+      return "Cash";
+    case "till":
+      return "Till";
+    case "withdrawal":
+      return "Withdrawal";
+    case "send_money":
+      return "Send Money";
+    default:
+      return String(src || "—");
+  }
+}
+
+async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    return JSON.parse(localStorage.getItem("dayOpen") || "null");
-  } catch {
-    return null;
+    const res = await fetch(input, { ...init, signal: ctrl.signal });
+    const data = await res.json().catch(() => ({}));
+    return { res, data };
+  } finally {
+    clearTimeout(t);
   }
 }
 
@@ -56,22 +83,20 @@ export default function SummeryPage() {
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
-  // Cashier controls (single day)
-  const [openingCash, setOpeningCash] = useState(0);
-  const [openingTill, setOpeningTill] = useState(0);
-
   // Manual withdrawals with details (single day)
   const [withdrawals, setWithdrawals] = useState([]);
+  const [wAmount, setWAmount] = useState("");
   const [wSource, setWSource] = useState("cash");
-  const [wAmount, setWAmount] = useState(0);
-  const [wNote, setWNote] = useState("");
+  const [wReason, setWReason] = useState("");
 
-  // Load sales/expenses
+  const [openInfo, setOpenInfo] = useState(null);
+  const [openInfoStatus, setOpenInfoStatus] = useState("idle"); // idle | loading | ok | timeout | error
+
   useEffect(() => {
     (async () => {
       try {
         const s = await (
-          await fetch(url("/api/sales?page=1&limit=4000"), { credentials: "include" })
+          await fetch(url("/api/sales?page=1&limit=5000"), { credentials: "include" })
         ).json();
         const sRows = Array.isArray(s) ? s : Array.isArray(s?.rows) ? s.rows : [];
         setSales(sRows);
@@ -91,26 +116,15 @@ export default function SummeryPage() {
   const isSingleDay = useMemo(() => sameDay(dFrom, dTo), [dFrom, dTo]);
   const dayKey = useMemo(() => fmtD(dFrom), [dFrom]);
 
-  // Load cashier config for selected day (single day only)
+  // Load manual withdrawals for selected single day (local only)
+  const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
   useEffect(() => {
-    if (!isSingleDay) return;
-
-    const dayOpen = readDayOpen();
-    const dayOpenMatches = dayOpen?.date === dayKey;
-
-    const oc = dayOpenMatches
-      ? Number(dayOpen?.openingCashTotal || 0)
-      : Number(localStorage.getItem(lsKey("opening_cash", dayKey)) || 0);
-
-    const ot = dayOpenMatches
-      ? Number(dayOpen?.openingTillTotal ?? dayOpen?.mpesaWithdrawal ?? 0)
-      : Number(localStorage.getItem(lsKey("opening_till", dayKey)) || 0);
-
-    setOpeningCash(oc);
-    setOpeningTill(ot);
-
-    const raw = localStorage.getItem(lsKey("withdrawals", dayKey));
+    if (!isSingleDay) {
+      setWithdrawals([]);
+      return;
+    }
     try {
+      const raw = localStorage.getItem(lsKey("withdrawals", dayKey));
       const list = raw ? JSON.parse(raw) : [];
       setWithdrawals(Array.isArray(list) ? list : []);
     } catch {
@@ -118,111 +132,202 @@ export default function SummeryPage() {
     }
   }, [isSingleDay, dayKey]);
 
-  // Persist opening values + withdrawals for selected day (single day only)
   useEffect(() => {
     if (!isSingleDay) return;
-    localStorage.setItem(lsKey("opening_cash", dayKey), String(Number(openingCash || 0)));
-  }, [openingCash, isSingleDay, dayKey]);
-  useEffect(() => {
-    if (!isSingleDay) return;
-    localStorage.setItem(lsKey("opening_till", dayKey), String(Number(openingTill || 0)));
-  }, [openingTill, isSingleDay, dayKey]);
-  useEffect(() => {
-    if (!isSingleDay) return;
-    localStorage.setItem(lsKey("withdrawals", dayKey), JSON.stringify(withdrawals || []));
+    try {
+      localStorage.setItem(lsKey("withdrawals", dayKey), JSON.stringify(withdrawals || []));
+    } catch {}
   }, [withdrawals, isSingleDay, dayKey]);
 
-  // Range filters
-  const inRange = (t) => {
-    const d = new Date(t);
-    return d >= dFrom && d <= dTo;
-  };
+  // Load opening values from Cash page / backend sheet (single day)
+  useEffect(() => {
+    if (!isSingleDay) {
+      setOpenInfo(null);
+      setOpenInfoStatus("idle");
+      return;
+    }
 
-  const salesInRange = useMemo(() => sales.filter((s) => inRange(s.createdAt)), [sales, dFrom, dTo]);
-  const expensesInRange = useMemo(() => expenses.filter((e) => inRange(e.date)), [expenses, dFrom, dTo]);
+    let cancelled = false;
+    const token = getToken();
 
-  // Totals
+    // Immediate best-effort from localStorage dayOpen (often today)
+    try {
+      const raw = localStorage.getItem("dayOpen");
+      const d = raw ? JSON.parse(raw) : null;
+      if (d && String(d.date) === String(dayKey)) {
+        setOpenInfo({
+          found: true,
+          date: dayKey,
+          openId: d.openId || "",
+          openedAt: d.openedAt || "",
+          tillNo: d.tillNo || "",
+          openingCashTotal: Number(d.openingCashTotal || 0),
+          openingTillTotal: Number(d.openingTillTotal || 0),
+          withdrawalCash: Number(d.withdrawalCash ?? d.mpesaWithdrawal ?? 0),
+          sendMoney: Number(d.sendMoney || 0),
+        });
+      }
+    } catch {}
+
+    (async () => {
+      setOpenInfoStatus("loading");
+      try {
+        const { res, data } = await fetchJsonWithTimeout(
+          `/api/cash/today?date=${encodeURIComponent(dayKey)}`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            cache: "no-store",
+          },
+          2500
+        );
+
+        if (cancelled) return;
+
+        if (res.ok && data?.found && data?.row) {
+          const row = data.row;
+          setOpenInfo({
+            found: true,
+            date: dayKey,
+            openId: row.openId || row.openID || "",
+            openedAt: row.openedAt || "",
+            tillNo: String(row.tillNo || ""),
+            openingCashTotal: Number(row.openingCashTotal || 0),
+            openingTillTotal: Number(row.openingTillTotal || 0),
+            withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
+            sendMoney: Number(row.sendMoney || 0),
+          });
+          setOpenInfoStatus("ok");
+          return;
+        }
+
+        setOpenInfo(null);
+        setOpenInfoStatus("ok");
+      } catch (e) {
+        if (cancelled) return;
+        if (e?.name === "AbortError") {
+          setOpenInfoStatus("timeout");
+          return;
+        }
+        setOpenInfoStatus("error");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSingleDay, dayKey]);
+
   const totals = useMemo(() => {
+    const inRange = (t) => {
+      const d = new Date(t);
+      return d >= dFrom && d <= dTo;
+    };
+    const salesInRange = sales.filter((s) => inRange(s.createdAt));
     const totalSales = salesInRange.reduce((sum, r) => sum + Number(r.total || 0), 0);
+    const totalExpenses = expenses.filter((e) => inRange(e.date)).reduce((s, r) => s + Number(r.amount || 0), 0);
+
     const cashSales = salesInRange.reduce((sum, r) => (normPM(r) === "cash" ? sum + Number(r.total || 0) : sum), 0);
     const tillSales = salesInRange.reduce((sum, r) => (normPM(r) === "till" ? sum + Number(r.total || 0) : sum), 0);
     const withdrawalSales = salesInRange.reduce(
       (sum, r) => (normPM(r) === "withdrawal" ? sum + Number(r.total || 0) : sum),
       0
     );
-    const totalExpenses = expensesInRange.reduce((sum, r) => sum + Number(r.amount || 0), 0);
-    const netProfit = totalSales - totalExpenses;
-    return { totalSales, totalExpenses, netProfit, cashSales, tillSales, withdrawalSales };
-  }, [salesInRange, expensesInRange]);
+    const sendMoneySales = salesInRange.reduce(
+      (sum, r) => (normPM(r) === "send_money" ? sum + Number(r.total || 0) : sum),
+      0
+    );
 
-  // Manual withdrawals breakdown (single day)
+    return {
+      totalSales,
+      totalExpenses,
+      netProfit: totalSales - totalExpenses,
+      cashSales,
+      tillSales,
+      withdrawalSales,
+      sendMoneySales,
+      salesInRange,
+    };
+  }, [sales, expenses, dFrom, dTo]);
+
   const withdrawalManual = useMemo(() => {
-    const cash = withdrawals.filter((w) => w.source === "cash").reduce((s, w) => s + Number(w.amount || 0), 0);
-    const till = withdrawals.filter((w) => w.source === "till").reduce((s, w) => s + Number(w.amount || 0), 0);
-    return { cash, till, total: cash + till };
+    const sum = (src) =>
+      withdrawals
+        .filter((w) => w.source === src)
+        .reduce((s, w) => s + Number(w.amount || 0), 0);
+    const cash = sum("cash");
+    const till = sum("till");
+    const withdrawal = sum("withdrawal");
+    const sendMoney = sum("send_money");
+    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
   }, [withdrawals]);
 
-  // Expected cashier balances (single day only)
+  const openings = useMemo(() => {
+    if (!isSingleDay || !openInfo?.found) {
+      return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0 };
+    }
+    return {
+      cash: Number(openInfo.openingCashTotal || 0),
+      till: Number(openInfo.openingTillTotal || 0),
+      withdrawal: Number(openInfo.withdrawalCash || 0),
+      sendMoney: Number(openInfo.sendMoney || 0),
+    };
+  }, [isSingleDay, openInfo]);
+
   const cashierBalances = useMemo(() => {
-    if (!isSingleDay) return null;
-    const cash = Number(openingCash || 0) + Number(totals.cashSales || 0) - Number(withdrawalManual.cash || 0);
-    const till = Number(openingTill || 0) + Number(totals.tillSales || 0) - Number(withdrawalManual.till || 0);
-    return { cash, till, grand: cash + till };
-  }, [isSingleDay, openingCash, openingTill, totals.cashSales, totals.tillSales, withdrawalManual]);
+    if (!isSingleDay) {
+      return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0, total: 0 };
+    }
+
+    const cash = openings.cash + Number(totals.cashSales || 0) - Number(withdrawalManual.cash || 0);
+    const till = openings.till + Number(totals.tillSales || 0) - Number(withdrawalManual.till || 0);
+    const withdrawal = openings.withdrawal + Number(totals.withdrawalSales || 0) - Number(withdrawalManual.withdrawal || 0);
+    const sendMoney = openings.sendMoney + Number(totals.sendMoneySales || 0) - Number(withdrawalManual.sendMoney || 0);
+
+    return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
+  }, [isSingleDay, openings, totals, withdrawalManual]);
 
   // POS withdrawals details (paymentMethod=withdrawal)
-  const posWithdrawals = useMemo(() => salesInRange.filter((r) => normPM(r) === "withdrawal"), [salesInRange]);
+  const posWithdrawals = useMemo(
+    () => totals.salesInRange.filter((r) => normPM(r) === "withdrawal"),
+    [totals.salesInRange]
+  );
 
-  function addWithdrawal() {
-    if (!isSingleDay) return;
-    const amt = Number(wAmount || 0);
-    if (!Number.isFinite(amt) || amt <= 0) {
+  const addWithdrawal = () => {
+    const n = Number(String(wAmount || "").replace(/,/g, ""));
+    if (!Number.isFinite(n) || n <= 0) {
       alert("Please enter a valid withdrawal amount.");
       return;
     }
-    const row = {
+    const entry = {
       id: `${Date.now()}`,
-      time: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      amount: n,
       source: wSource,
-      amount: amt,
-      note: String(wNote || "").trim(),
+      reason: wReason || "",
     };
-    setWithdrawals((prev) => [row, ...prev]);
-    setWAmount(0);
-    setWNote("");
-  }
+    setWithdrawals((prev) => [entry, ...(prev || [])]);
+    setWAmount("");
+    setWReason("");
+  };
 
-  function removeWithdrawal(id) {
-    setWithdrawals((prev) => prev.filter((x) => x.id !== id));
-  }
+  const removeWithdrawal = (id) => {
+    setWithdrawals((prev) => (prev || []).filter((w) => w.id !== id));
+  };
 
   const withdrawalColumns = [
     {
-      key: "time",
-      title: "Time",
-      render: (r) => (
-        <div>
-          <div className="font-semibold text-ink">{fmtT(r.time)}</div>
-          <div className="text-xs text-mute">{fmtD(r.time)}</div>
-        </div>
-      ),
+      key: "createdAt",
+      header: "Time",
+      render: (r) => new Date(r.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
-    {
-      key: "source",
-      title: "Source",
-      render: (r) => (
-        <span className={r.source === "cash" ? "ui-badge-gold" : "ui-badge-green"}>
-          {r.source}
-        </span>
-      ),
-    },
-    { key: "amount", title: "Amount", render: (r) => <b>{K(r.amount)}</b> },
-    { key: "note", title: "Note", render: (r) => <span className="text-mute">{r.note || "—"}</span> },
+    { key: "source", header: "Source", render: (r) => srcLabel(r.source) },
+    { key: "amount", header: "Amount", render: (r) => K(r.amount) },
+    { key: "reason", header: "Reason", render: (r) => r.reason || "—" },
     {
       key: "actions",
-      title: "",
+      header: "",
       render: (r) => (
-        <button className="ui-btn ui-btn-ghost" onClick={() => removeWithdrawal(r.id)}>
+        <button className="ui-btn ui-btn-ghost !px-3" onClick={() => removeWithdrawal(r.id)} type="button">
           Remove
         </button>
       ),
@@ -230,175 +335,154 @@ export default function SummeryPage() {
   ];
 
   const posWithdrawalColumns = [
-    { key: "invoiceNo", title: "Invoice", render: (r) => <b>{r.invoiceNo || "—"}</b> },
-    { key: "createdAt", title: "Time", render: (r) => <span className="text-mute">{fmtT(r.createdAt)}</span> },
-    { key: "total", title: "Total", render: (r) => <b>{K(r.total)}</b> },
-    { key: "clientName", title: "Client", render: (r) => <span className="text-mute">{r.clientName || "—"}</span> },
+    { key: "createdAt", header: "Date", render: (r) => fmtD(r.createdAt) },
+    { key: "invoiceNo", header: "Invoice" },
+    { key: "clientName", header: "Client" },
+    { key: "total", header: "Total", render: (r) => K(r.total) },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header + date range */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="ui-h1">Summary</div>
           <div className="ui-sub mt-1">Cashier + totals + withdrawals with details</div>
         </div>
-
-        <div className="ui-card p-3 md:p-4 flex flex-wrap items-center gap-3">
-          <div className="text-xs font-bold uppercase tracking-wider text-mute">Range</div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              className="ui-input !w-auto"
-              value={fromDate}
-              max={toDate}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
-            <span className="text-mute">→</span>
-            <input
-              type="date"
-              className="ui-input !w-auto"
-              value={toDate}
-              min={fromDate}
-              onChange={(e) => setToDate(e.target.value)}
-            />
-          </div>
-
-          {!isSingleDay && (
-            <span className="ui-badge">Cashier section works when From = To</span>
-          )}
+        <div className="ui-badge">
+          Range: <b className="ml-1">{fromDate}</b> → <b>{toDate}</b>
         </div>
       </div>
 
-      {/* KPI */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <Card title="Total Sales" value={K(totals.totalSales)} subtitle="All payments" />
-        <Card title="Total Expenses" value={K(totals.totalExpenses)} subtitle="Operational costs" />
-        <Card title="Net Profit" value={K(totals.netProfit)} subtitle="Sales minus expenses" />
-      </div>
-
-      <Section title="Sales by Payment Method" subtitle="Cash / Till / Withdrawal (POS)">
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-          <Card title="Cash Sales" value={K(totals.cashSales)} />
-          <Card title="Till Sales" value={K(totals.tillSales)} />
-          <Card title="Withdrawal (POS)" value={K(totals.withdrawalSales)} />
+      {/* Date range */}
+      <Section title="Date Range" subtitle="Choose From / To">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="block">
+            <span className="ui-label">From</span>
+            <input className="ui-input mt-1" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className="ui-label">To</span>
+            <input className="ui-input mt-1" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </label>
+          <div className="ui-card p-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-mute">Mode</div>
+            <div className="mt-1 font-extrabold text-ink">{isSingleDay ? "Single Day" : "Range"}</div>
+            <div className="ui-sub mt-1">
+              To manage cashier (opening + expected + manual withdrawals), set <b>From = To</b>.
+            </div>
+          </div>
         </div>
       </Section>
 
-      {/* Cashier section */}
-      <Section
-        title="Cashier"
-        subtitle={isSingleDay ? `Day: ${dayKey}` : "Select a single day to enable cashier calculations"}
-      >
-        {!isSingleDay ? (
-          <div className="ui-card p-4 text-sm text-mute">
-            To manage cashier totals (opening cash, opening till, withdrawals), set <b>From = To</b>.
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Opening */}
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <div className="ui-card p-4">
-                <div className="text-xs font-bold uppercase tracking-wider text-mute">Opening Cash</div>
-                <input
-                  type="number"
-                  min="0"
-                  className="ui-input mt-2"
-                  value={openingCash}
-                  onChange={(e) => setOpeningCash(Number(e.target.value || 0))}
-                />
-                <div className="ui-sub mt-2">Stored locally for this day</div>
-              </div>
-              <div className="ui-card p-4">
-                <div className="text-xs font-bold uppercase tracking-wider text-mute">Opening Till</div>
-                <input
-                  type="number"
-                  min="0"
-                  className="ui-input mt-2"
-                  value={openingTill}
-                  onChange={(e) => setOpeningTill(Number(e.target.value || 0))}
-                />
-                <div className="ui-sub mt-2">Stored locally for this day</div>
-              </div>
-            </div>
+      {/* Totals */}
+      <Section title="Totals" subtitle="Sales / Expenses / Net">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+          <Card title="Total Sales" value={K(totals.totalSales)} />
+          <Card title="Total Expenses" value={K(totals.totalExpenses)} />
+          <Card title="Net Profit" value={K(totals.netProfit)} />
+        </div>
+      </Section>
 
-            {/* Expected balances */}
-            {cashierBalances && (
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-                <Card
-                  title="Expected Cash"
-                  value={K(cashierBalances.cash)}
-                  subtitle={`Opening + Cash Sales - Withdrawals (${K(withdrawalManual.cash)})`}
-                />
-                <Card
-                  title="Expected Till"
-                  value={K(cashierBalances.till)}
-                  subtitle={`Opening + Till Sales - Withdrawals (${K(withdrawalManual.till)})`}
-                />
-                <Card title="Grand Total" value={K(cashierBalances.grand)} subtitle="Cash + Till" />
+      {/* Sales by payment method */}
+      <Section title="Sales by Payment Method" subtitle="Computed from POS sales within the selected range">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+          <Card title="Cash" value={K(totals.cashSales)} />
+          <Card title="Till" value={K(totals.tillSales)} />
+          <Card title="Withdrawal" value={K(totals.withdrawalSales)} />
+          <Card title="Send Money" value={K(totals.sendMoneySales)} />
+        </div>
+      </Section>
+
+      {/* Cashier */}
+      <Section title="Cashier" subtitle="Opening values are read from Cash page. Expected = Opening + Sales - Manual Withdrawals">
+        {!isSingleDay && (
+          <div className="ui-card p-4 text-sm text-mute">Set From = To to manage cashier balances.</div>
+        )}
+
+        {isSingleDay && (
+          <>
+            {(openInfoStatus === "timeout" || openInfoStatus === "error") && (
+              <div className="ui-card p-4 text-sm">
+                <b>Note:</b> Could not load opening values from the server ({openInfoStatus}). If your backend is on a free plan it may be sleeping.
               </div>
             )}
 
-            {/* Withdrawals add */}
-            <div className="ui-card p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <div className="ui-h2">Manual Withdrawals</div>
-                  <div className="ui-sub mt-1">Record withdrawals with details</div>
-                </div>
-
-                <div className="flex flex-wrap items-end gap-2">
-                  <label className="block">
-                    <span className="ui-label">Source</span>
-                    <select className="ui-select mt-1 !w-auto" value={wSource} onChange={(e) => setWSource(e.target.value)}>
-                      <option value="cash">cash</option>
-                      <option value="till">till</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="ui-label">Amount</span>
-                    <input
-                      type="number"
-                      min="0"
-                      className="ui-input mt-1 !w-[160px]"
-                      value={wAmount}
-                      onChange={(e) => setWAmount(Number(e.target.value || 0))}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="ui-label">Note</span>
-                    <input
-                      type="text"
-                      className="ui-input mt-1 !w-[220px]"
-                      value={wNote}
-                      onChange={(e) => setWNote(e.target.value)}
-                      placeholder="e.g. supplier payment"
-                    />
-                  </label>
-                  <button className="ui-btn ui-btn-primary" onClick={addWithdrawal}>
-                    Add
-                  </button>
-                </div>
+            {!openInfo?.found && openInfoStatus === "ok" && (
+              <div className="ui-card p-4 text-sm">
+                <b>No Start Day found</b> for {dayKey}. Open the day from the <b>Cash</b> page first.
               </div>
+            )}
 
-              <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-3">
-                <Card title="Withdrawals (Cash)" value={K(withdrawalManual.cash)} />
-                <Card title="Withdrawals (Till)" value={K(withdrawalManual.till)} />
-                <Card title="Withdrawals (Total)" value={K(withdrawalManual.total)} />
-              </div>
-
-              <div className="mt-4">
-                <Table columns={withdrawalColumns} data={withdrawals} keyField="id" emptyText="No withdrawals" />
-              </div>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+              <Card title="Opening Cash" value={K(openings.cash)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
+              <Card title="Opening Till" value={K(openings.till)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
+              <Card title="Opening Withdrawal" value={K(openings.withdrawal)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
+              <Card title="Opening Send Money" value={K(openings.sendMoney)} subtitle={openInfo?.found ? "From Cash page" : "—"} />
             </div>
 
-            {/* POS withdrawals list */}
-            <Section title="POS Withdrawals" subtitle="Sales recorded with paymentMethod = withdrawal">
-              <Table columns={posWithdrawalColumns} data={posWithdrawals} keyField="invoiceNo" emptyText="No POS withdrawals" />
-            </Section>
-          </div>
+            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-5">
+              <Card title="Expected Cash" value={K(cashierBalances.cash)} subtitle={`- Withdrawals: ${K(withdrawalManual.cash)}`} />
+              <Card title="Expected Till" value={K(cashierBalances.till)} subtitle={`- Withdrawals: ${K(withdrawalManual.till)}`} />
+              <Card title="Expected Withdrawal" value={K(cashierBalances.withdrawal)} subtitle={`- Withdrawals: ${K(withdrawalManual.withdrawal)}`} />
+              <Card title="Expected Send Money" value={K(cashierBalances.sendMoney)} subtitle={`- Withdrawals: ${K(withdrawalManual.sendMoney)}`} />
+              <Card title="Expected Total" value={K(cashierBalances.total)} subtitle="All methods" />
+            </div>
+          </>
         )}
+      </Section>
+
+      {/* Manual withdrawals */}
+      <Section title="Manual Withdrawals" subtitle="Money taken out during the day (record the source)" >
+        {!isSingleDay && (
+          <div className="ui-card p-4 text-sm text-mute">Manual withdrawals are available for single day only (set From = To).</div>
+        )}
+
+        {isSingleDay && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <label className="block">
+                <span className="ui-label">Amount</span>
+                <input className="ui-input mt-1" value={wAmount} onChange={(e) => setWAmount(e.target.value)} inputMode="numeric" placeholder="0" />
+              </label>
+              <label className="block">
+                <span className="ui-label">Source</span>
+                <select className="ui-select mt-1" value={wSource} onChange={(e) => setWSource(e.target.value)}>
+                  <option value="cash">Cash</option>
+                  <option value="till">Till</option>
+                  <option value="withdrawal">Withdrawal</option>
+                  <option value="send_money">Send Money</option>
+                </select>
+              </label>
+              <label className="block md:col-span-2">
+                <span className="ui-label">Reason</span>
+                <input className="ui-input mt-1" value={wReason} onChange={(e) => setWReason(e.target.value)} placeholder="e.g. supplier payment" />
+              </label>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <button className="ui-btn ui-btn-primary" onClick={addWithdrawal} type="button">
+                Add Withdrawal
+              </button>
+              <div className="ui-badge">Total: <b className="ml-1">{K(withdrawalManual.total)}</b></div>
+            </div>
+
+            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-4">
+              <Card title="Withdrawals (Cash)" value={K(withdrawalManual.cash)} />
+              <Card title="Withdrawals (Till)" value={K(withdrawalManual.till)} />
+              <Card title="Withdrawals (Withdrawal)" value={K(withdrawalManual.withdrawal)} />
+              <Card title="Withdrawals (Send Money)" value={K(withdrawalManual.sendMoney)} />
+            </div>
+
+            <div className="mt-4">
+              <Table columns={withdrawalColumns} data={withdrawals} keyField="id" emptyText="No manual withdrawals" />
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* POS payment-method: Withdrawal */}
+      <Section title="Withdrawals" subtitle="Sales recorded with paymentMethod = withdrawal (this is a payment method)">
+        <Table columns={posWithdrawalColumns} data={posWithdrawals} keyField="invoiceNo" emptyText="No withdrawals" />
       </Section>
     </div>
   );

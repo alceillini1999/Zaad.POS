@@ -70,18 +70,6 @@ function getLocalDateISO() {
   return `${yyyy}-${mm}-${dd}`
 }
 
-async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
-  const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), timeoutMs)
-  try {
-    const res = await fetch(input, { ...init, signal: ctrl.signal })
-    const data = await res.json().catch(() => ({}))
-    return { res, data }
-  } finally {
-    clearTimeout(t)
-  }
-}
-
 /* ======================
    UI Wrappers
 ====================== */
@@ -132,14 +120,12 @@ function DayOpenedRoute({ children }) {
       }
 
       try {
-        const { res: r, data } = await fetchJsonWithTimeout(
-          `/api/cash/today?date=${encodeURIComponent(today)}`,
-          {
-            headers: { Authorization: `Bearer ${getToken()}` },
-            cache: 'no-store',
-          },
-          2500
-        )
+        const r = await fetch(`/api/cash/today?date=${encodeURIComponent(today)}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+          cache: 'no-store',
+        })
+
+        const data = await r.json().catch(() => ({}))
 
         if (r.status === 401 || r.status === 403) {
           clearSession()
@@ -154,11 +140,10 @@ function DayOpenedRoute({ children }) {
             openId: row.openId || row.openID || '',
             openedAt: row.openedAt || '',
             openingCashTotal: Number(row.openingCashTotal || 0),
-            openingTillTotal: Number(row.openingTillTotal || 0),
             cashBreakdown: Array.isArray(row.cashBreakdown) ? row.cashBreakdown : [],
             tillNo: String(row.tillNo || ''),
-            mpesaWithdrawal: Number(row.mpesaWithdrawal ?? row.withdrawalCash ?? 0),
-            withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
+            mpesaWithdrawal: Number(row.mpesaWithdrawal || 0),
+            withdrawalCash: Number(row.mpesaWithdrawal || 0),
             sendMoney: Number(row.sendMoney || 0),
           }
           setDayOpen(loaded)
@@ -242,9 +227,6 @@ function CashPage() {
 
   const [counts, setCounts] = useState(buildInitialCounts())
   const [tillNo, setTillNo] = useState(dayOpenState?.tillNo ? String(dayOpenState.tillNo) : '')
-  const [tillTotal, setTillTotal] = useState(
-    dayOpenState?.openingTillTotal != null ? String(dayOpenState.openingTillTotal) : '0'
-  )
   // Payment methods (besides cash)
   const [withdrawalCash, setWithdrawalCash] = useState(
     dayOpenState?.withdrawalCash != null
@@ -263,14 +245,11 @@ function CashPage() {
     async function loadOpenedDay() {
       if (isOpenedToday) return
       try {
-        const { res: r, data } = await fetchJsonWithTimeout(
-          `/api/cash/today?date=${encodeURIComponent(today)}`,
-          {
-            headers: { Authorization: `Bearer ${getToken()}` },
-            cache: 'no-store',
-          },
-          2500
-        )
+        const r = await fetch(`/api/cash/today?date=${encodeURIComponent(today)}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+          cache: 'no-store',
+        })
+        const data = await r.json().catch(() => ({}))
         if (!r.ok || !data?.found || !data?.row) return
 
         const row = data.row
@@ -279,11 +258,10 @@ function CashPage() {
           openId: row.openId || row.openID || '',
           openedAt: row.openedAt || '',
           openingCashTotal: Number(row.openingCashTotal || 0),
-          openingTillTotal: Number(row.openingTillTotal || 0),
           cashBreakdown: Array.isArray(row.cashBreakdown) ? row.cashBreakdown : [],
           tillNo: String(row.tillNo || ''),
-          mpesaWithdrawal: Number(row.mpesaWithdrawal ?? row.withdrawalCash ?? 0),
-          withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
+          mpesaWithdrawal: Number(row.mpesaWithdrawal || 0),
+          withdrawalCash: Number(row.mpesaWithdrawal || 0),
           sendMoney: Number(row.sendMoney || 0),
         }
 
@@ -307,11 +285,9 @@ function CashPage() {
     setOk('')
     if (isOpenedToday && dayOpenState?.tillNo) setTillNo(String(dayOpenState.tillNo))
     if (isOpenedToday) {
-      setTillTotal(String(dayOpenState?.openingTillTotal ?? 0))
       setWithdrawalCash(String(dayOpenState?.withdrawalCash ?? dayOpenState?.mpesaWithdrawal ?? 0))
       setSendMoney(String(dayOpenState?.sendMoney ?? 0))
     } else {
-      setTillTotal('0')
       setWithdrawalCash('0')
       setSendMoney('0')
     }
@@ -349,9 +325,6 @@ function CashPage() {
       if (totalCash === null) throw new Error('Please enter valid whole numbers for cash counts.')
       if (!tillNo.trim()) throw new Error('Till Number is required.')
 
-      const tillNum = parseNonNegNumber(tillTotal)
-      if (tillNum === null) throw new Error('Till Amount must be a non-negative number.')
-
       const withdrawalNum = parseNonNegNumber(withdrawalCash)
       if (withdrawalNum === null) throw new Error('Withdrawal Cash must be a non-negative number.')
 
@@ -361,7 +334,6 @@ function CashPage() {
       const payload = {
         date: today,
         openingCashTotal: totalCash,
-        openingTillTotal: tillNum,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
         // Back-compat: backend currently reads mpesaWithdrawal. We also send a clearer name.
@@ -387,14 +359,11 @@ function CashPage() {
         // If the day is already opened, load it from backend and switch UI to End Day
         if (r.status === 409) {
           try {
-            const { res: rr, data: dd } = await fetchJsonWithTimeout(
-              `/api/cash/today?date=${encodeURIComponent(today)}`,
-              {
-                headers: { Authorization: `Bearer ${getToken()}` },
-                cache: 'no-store',
-              },
-              2500
-            )
+            const rr = await fetch(`/api/cash/today?date=${encodeURIComponent(today)}`, {
+              headers: { Authorization: `Bearer ${getToken()}` },
+              cache: 'no-store',
+            })
+            const dd = await rr.json().catch(() => ({}))
             if (rr.ok && dd?.found && dd?.row) {
               const row = dd.row
               const loaded = {
@@ -402,11 +371,10 @@ function CashPage() {
                 openId: row.openId || row.openID || data?.openId || '',
                 openedAt: row.openedAt || '',
                 openingCashTotal: Number(row.openingCashTotal || 0),
-                openingTillTotal: Number(row.openingTillTotal || 0),
                 cashBreakdown: Array.isArray(row.cashBreakdown) ? row.cashBreakdown : [],
                 tillNo: String(row.tillNo || ''),
-                mpesaWithdrawal: Number(row.mpesaWithdrawal ?? row.withdrawalCash ?? 0),
-                withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
+                mpesaWithdrawal: Number(row.mpesaWithdrawal || 0),
+                withdrawalCash: Number(row.mpesaWithdrawal || 0),
                 sendMoney: Number(row.sendMoney || 0),
               }
               setDayOpen(loaded)
@@ -423,7 +391,6 @@ function CashPage() {
         date: today,
         openId: data?.openId || data?.id || null,
         openingCashTotal: totalCash,
-        openingTillTotal: tillNum,
         cashBreakdown: payload.cashBreakdown,
         tillNo: tillNo.trim(),
         mpesaWithdrawal: withdrawalNum,
@@ -462,7 +429,6 @@ function CashPage() {
         date: today,
         openId: dayOpenState?.openId || null,
         closingCashTotal: totalCash,
-        closingTillTotal: tillNum,
         cashBreakdown: buildBreakdown(),
         tillNo: tillNo.trim(),
         mpesaWithdrawal: withdrawalNum,
@@ -528,7 +494,7 @@ function CashPage() {
             <h3 className="text-lg font-semibold">Payment Methods</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold mb-1">Withdrawal Cash (KSh)</label>
               <input
@@ -552,23 +518,6 @@ function CashPage() {
                 value={tillNo}
                 onChange={(e) => setTillNo(e.target.value)}
                 placeholder="e.g. TILL-1"
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  borderRadius: 12,
-                  border: '1px solid rgba(0,0,0,0.2)',
-                  background: 'white',
-                }}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Till Amount (KSh)</label>
-              <input
-                value={tillTotal}
-                onChange={(e) => setTillTotal(e.target.value)}
-                inputMode="decimal"
-                placeholder="0"
                 style={{
                   width: '100%',
                   padding: 10,
@@ -854,34 +803,6 @@ function EndDayFloatingControl() {
 ====================== */
 function RoutedPages() {
   const location = useLocation()
-
-  // Keep backend warm (helps when hosting on free tiers that sleep after inactivity).
-  useEffect(() => {
-    const ping = () => {
-      const token = getToken()
-      if (!token) return
-      fetch('/api/healthz', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      }).catch(() => {})
-    }
-
-    const onFocus = () => ping()
-    const onVis = () => {
-      if (!document.hidden) ping()
-    }
-
-    ping()
-    const id = setInterval(ping, 8 * 60 * 1000)
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVis)
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVis)
-    }
-  }, [])
-
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
