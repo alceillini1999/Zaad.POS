@@ -260,10 +260,6 @@ router.get('/summary', async (req, res) => {
 
 // ============ POST /api/cash/open (kept, but now supports AUTO openingCashTotal) ============
 router.post('/open', async (req, res) => {
-    const openingTillTotal = toNum(body.openingTillTotal, 0);
-    if (openingTillTotal < 0) {
-      return res.status(400).json({ error: 'openingTillTotal must be a non-negative number' });
-    }
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 

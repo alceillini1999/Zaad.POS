@@ -11,6 +11,7 @@ import {
 
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import ManagerRoute from './components/ManagerRoute'
 
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -920,13 +921,15 @@ function RoutedPages() {
           path="/summery"
           element={
             <ProtectedRoute>
-              <DayOpenedRoute>
-                <PageWrapper>
-                  <div className="summery-page space-y-6">
-                    <SummeryPage />
-                  </div>
-                </PageWrapper>
-              </DayOpenedRoute>
+              <ManagerRoute>
+                <DayOpenedRoute>
+                  <PageWrapper>
+                    <div className="summery-page space-y-6">
+                      <SummeryPage />
+                    </div>
+                  </PageWrapper>
+                </DayOpenedRoute>
+              </ManagerRoute>
             </ProtectedRoute>
           }
         />
@@ -950,13 +953,15 @@ function RoutedPages() {
           path="/products"
           element={
             <ProtectedRoute>
-              <DayOpenedRoute>
-                <PageWrapper>
-                  <div className="products-page space-y-6">
-                    <ProductsPage />
-                  </div>
-                </PageWrapper>
-              </DayOpenedRoute>
+              <ManagerRoute>
+                <DayOpenedRoute>
+                  <PageWrapper>
+                    <div className="products-page space-y-6">
+                      <ProductsPage />
+                    </div>
+                  </PageWrapper>
+                </DayOpenedRoute>
+              </ManagerRoute>
             </ProtectedRoute>
           }
         />
@@ -995,13 +1000,15 @@ function RoutedPages() {
           path="/clients"
           element={
             <ProtectedRoute>
-              <DayOpenedRoute>
-                <PageWrapper>
-                  <div className="clients-page space-y-6">
-                    <ClientsPage />
-                  </div>
-                </PageWrapper>
-              </DayOpenedRoute>
+              <ManagerRoute>
+                <DayOpenedRoute>
+                  <PageWrapper>
+                    <div className="clients-page space-y-6">
+                      <ClientsPage />
+                    </div>
+                  </PageWrapper>
+                </DayOpenedRoute>
+              </ManagerRoute>
             </ProtectedRoute>
           }
         />
@@ -1025,13 +1032,15 @@ function RoutedPages() {
           path="/whatsapp"
           element={
             <ProtectedRoute>
-              <DayOpenedRoute>
-                <PageWrapper>
-                  <div className="space-y-6">
-                    <WhatsAppPage />
-                  </div>
-                </PageWrapper>
-              </DayOpenedRoute>
+              <ManagerRoute>
+                <DayOpenedRoute>
+                  <PageWrapper>
+                    <div className="space-y-6">
+                      <WhatsAppPage />
+                    </div>
+                  </PageWrapper>
+                </DayOpenedRoute>
+              </ManagerRoute>
             </ProtectedRoute>
           }
         />
