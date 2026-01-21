@@ -2,6 +2,10 @@ import React, { useMemo, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 
 // Simple manager gate for sensitive pages.
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
 // IMPORTANT: This version DOES NOT persist unlock state.
 // The user must enter the PIN every time they enter the page.
 
@@ -13,6 +17,48 @@ export default function ManagerRoute({ children }) {
 
   const requiredPin = useMemo(() => {
     // Configure this value in Render/Vite env as VITE_MANAGER_PIN
+<<<<<<< HEAD
+=======
+=======
+// Uses a local PIN (VITE_MANAGER_PIN) and stores a short-lived unlock flag.
+
+const STORAGE_KEY = 'manager_unlock_until'
+
+function nowMs() {
+  return Date.now()
+}
+
+function getUnlockUntil() {
+  try {
+    return Number(localStorage.getItem(STORAGE_KEY) || 0)
+  } catch {
+    return 0
+  }
+}
+
+function setUnlockForMinutes(minutes) {
+  const until = nowMs() + minutes * 60 * 1000
+  try {
+    localStorage.setItem(STORAGE_KEY, String(until))
+  } catch {}
+  return until
+}
+
+function clearUnlock() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {}
+}
+
+export default function ManagerRoute({ children, minutes = 30 }) {
+  const location = useLocation()
+  const [pin, setPin] = useState('')
+  const [err, setErr] = useState('')
+
+  const requiredPin = useMemo(() => {
+    // IMPORTANT: Configure this value in Render/Vite env as VITE_MANAGER_PIN
+>>>>>>> f89241e65e8175c959333876e3e5609aea11f6e7
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
     return (import.meta.env.VITE_MANAGER_PIN || '0000').toString()
   }, [])
 
@@ -26,6 +72,13 @@ export default function ManagerRoute({ children }) {
   })()
   if (!token) return <Navigate to="/login" replace />
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+  const unlocked = getUnlockUntil() > nowMs()
+>>>>>>> f89241e65e8175c959333876e3e5609aea11f6e7
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
   if (unlocked) return children
 
   function submit(e) {
@@ -42,8 +95,17 @@ export default function ManagerRoute({ children }) {
       setPin('')
       return
     }
+<<<<<<< HEAD
 
     setUnlocked(true)
+=======
+<<<<<<< HEAD
+
+    setUnlocked(true)
+=======
+    setUnlockForMinutes(Number(minutes || 30))
+>>>>>>> f89241e65e8175c959333876e3e5609aea11f6e7
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
     setPin('')
   }
 
@@ -81,6 +143,13 @@ export default function ManagerRoute({ children }) {
               type="button"
               className="ui-btn ui-btn-ghost"
               onClick={() => {
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+                clearUnlock()
+>>>>>>> f89241e65e8175c959333876e3e5609aea11f6e7
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
                 setPin('')
                 setErr('')
               }}
@@ -90,7 +159,15 @@ export default function ManagerRoute({ children }) {
           </div>
 
           <div className="text-xs text-ink/50">
+<<<<<<< HEAD
             You will be asked for the PIN again the next time you open this page.
+=======
+<<<<<<< HEAD
+            You will be asked for the PIN again the next time you open this page.
+=======
+            Unlock lasts <b>{minutes}</b> minutes on this device.
+>>>>>>> f89241e65e8175c959333876e3e5609aea11f6e7
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
           </div>
         </form>
       </div>
