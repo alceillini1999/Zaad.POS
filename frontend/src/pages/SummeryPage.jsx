@@ -15,6 +15,16 @@ const url = (p) => {
   return `${API_BASE}${path}`;
 };
 
+async function api(p, opts = {}) {
+  const res = await fetch(url(p), { mode: "cors", credentials: "include", ...opts });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(no body)");
+    throw new Error(`HTTP ${res.status} ${res.statusText} @ ${url(p)}\n${body}`);
+  }
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("json") ? res.json() : res.text();
+}
+
 const K = (n) =>
   `KSh ${Number(n || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`;
 
@@ -113,8 +123,7 @@ export default function SummeryPage() {
   const [wSource, setWSource] = useState("cash");
   const [wReason, setWReason] = useState("");
   const [wDate, setWDate] = useState(today);
-
-  const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
+  // Manual withdrawals are stored in Google Sheets (shared across devices)
 
   const dateKeysInRange = useMemo(() => {
     const keys = [];
@@ -153,25 +162,18 @@ export default function SummeryPage() {
   const dTo = useMemo(() => endOfDay(parseYMDLocal(toDate)), [toDate]);
   const isSingleDay = useMemo(() => dateKeysInRange.length === 1, [dateKeysInRange]);
 
-  // Load manual withdrawals for selected range (local only)
+  // Load manual withdrawals for selected range (shared via Google Sheets)
   useEffect(() => {
-    try {
-      const all = [];
-      for (const k of dateKeysInRange) {
-        const raw = localStorage.getItem(lsKey("withdrawals", k));
-        const list = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(list)) continue;
-        for (const w of list) {
-          all.push({ ...w, dateKey: w.dateKey || k });
-        }
+    (async () => {
+      try {
+        const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+        const list = await api(`/api/manual-withdrawals?${qs}`);
+        setWithdrawals(Array.isArray(list) ? list : []);
+      } catch {
+        setWithdrawals([]);
       }
-      // newest first
-      all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setWithdrawals(all);
-    } catch {
-      setWithdrawals([]);
-    }
-  }, [dateKeysInRange]);
+    })();
+  }, [fromDate, toDate]);
 
   // Load opening values from backend sheet for the selected range
   useEffect(() => {
@@ -230,20 +232,6 @@ export default function SummeryPage() {
   useEffect(() => {
     setWDate(toDate);
   }, [toDate]);
-
-  const readWithdrawalsForKeys = (keys) => {
-    const all = [];
-    for (const k of keys) {
-      const raw = localStorage.getItem(lsKey("withdrawals", k));
-      const list = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(list)) continue;
-      for (const w of list) {
-        all.push({ ...w, dateKey: w.dateKey || k });
-      }
-    }
-    all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return all;
-  };
 
   const totals = useMemo(() => {
     const inRange = (t) => {
@@ -342,62 +330,50 @@ export default function SummeryPage() {
     };
   }, [expectedAvailable, wAmount, wSource]);
 
-  const addWithdrawal = () => {
-    const n = Number(String(wAmount || "").replace(/,/g, ""));
-    if (!Number.isFinite(n) || n <= 0) {
-      alert("Please enter a valid withdrawal amount.");
-      return;
-    }
-    const k = String(wDate || "").trim();
-    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(k)) {
-      alert("Please select a valid withdrawal date.");
-      return;
-    }
-    const entry = {
-      id: `${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      dateKey: k,
-      amount: n,
-      source: wSource,
-      reason: wReason || "",
-    };
+  const addWithdrawal = async () => {
+    const k = String(wDate || today).trim(); // YYYY-MM-DD
+    const source = String(wSource || '').trim();
+    const amount = Number(wAmount || 0);
+
+    if (!source) return alert('Select source');
+    if (!amount || amount <= 0) return alert('Enter amount');
 
     try {
-      const raw = localStorage.getItem(lsKey("withdrawals", k));
-      const list = raw ? JSON.parse(raw) : [];
-      const next = Array.isArray(list) ? [entry, ...list] : [entry];
-      localStorage.setItem(lsKey("withdrawals", k), JSON.stringify(next));
-    } catch {}
+      await api('/api/manual-withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: k,
+          source,
+          amount,
+          note: wReason || '',
+          createdBy: localStorage.getItem('user') || ''
+        }),
+      });
+      const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+      const list = await api(`/api/manual-withdrawals?${qs}`);
+      setWithdrawals(Array.isArray(list) ? list : []);
+    } catch (e) {
+      alert(e.message || String(e));
+    }
 
-    // Re-read range to update UI
-    try {
-      setWithdrawals(readWithdrawalsForKeys(dateKeysInRange));
-    } catch {}
-
-    setWAmount("");
-    setWReason("");
+    setWAmount('');
+    setWReason('');
   };
 
-  const removeWithdrawal = (id) => {
-    const target = (withdrawals || []).find((w) => String(w.id) === String(id));
-    const k = target?.dateKey;
-    if (!k) {
-      setWithdrawals((prev) => (prev || []).filter((w) => w.id !== id));
-      return;
+  const removeWithdrawal = async (id) => {
+    try {
+      await api(`/api/manual-withdrawals/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+      const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+      const list = await api(`/api/manual-withdrawals?${qs}`);
+      setWithdrawals(Array.isArray(list) ? list : []);
+    } catch (e) {
+      alert(e.message || String(e));
     }
-    try {
-      const raw = localStorage.getItem(lsKey("withdrawals", k));
-      const list = raw ? JSON.parse(raw) : [];
-      const next = Array.isArray(list) ? list.filter((w) => String(w.id) !== String(id)) : [];
-      localStorage.setItem(lsKey("withdrawals", k), JSON.stringify(next));
-    } catch {}
-    try {
-      setWithdrawals(readWithdrawalsForKeys(dateKeysInRange));
-    } catch {}
   };
 
   const withdrawalColumns = [
-    { key: "dateKey", header: "Date", render: (r) => r.dateKey || "—" },
+    { key: "date", header: "Date", render: (r) => r.date || "—" },
     {
       key: "createdAt",
       header: "Time",
