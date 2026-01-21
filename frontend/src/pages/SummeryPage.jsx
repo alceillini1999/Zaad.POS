@@ -17,7 +17,19 @@ const url = (p) => {
 
 async function api(p, opts = {}) {
   // Avoid stale data across devices (browser/proxy caching)
-  const res = await fetch(url(p), { mode: "cors", credentials: "include", cache: "no-store", ...opts });
+  // Also attach Bearer token if present (some deployments enforce it)
+  const token = getToken();
+  const mergedHeaders = {
+    ...(opts.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  const res = await fetch(url(p), {
+    mode: "cors",
+    credentials: "include",
+    cache: "no-store",
+    ...opts,
+    headers: mergedHeaders,
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => "(no body)");
     throw new Error(`HTTP ${res.status} ${res.statusText} @ ${url(p)}\n${body}`);
