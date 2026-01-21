@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import Section from "../components/Section";
 import Card from "../components/Card";
 import Table from "../components/Table";
@@ -17,12 +18,8 @@ const url = (p) => {
 
 async function api(p, opts = {}) {
   // Avoid stale data across devices (browser/proxy caching)
-  // Also attach Bearer token if present (some deployments enforce it)
-  const token = getToken();
-  const mergedHeaders = {
-    ...(opts.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  // Auth is via httpOnly cookie
+  const mergedHeaders = { ...(opts.headers || {}) };
   const res = await fetch(url(p), {
     mode: "cors",
     credentials: "include",
@@ -74,13 +71,7 @@ const parseYMDLocal = (s) => {
 
 const fmtD = (d) => toLocalYMD(d);
 
-function getToken() {
-  try {
-    return localStorage.getItem("token") || "";
-  } catch {
-    return "";
-  }
-}
+// Auth is cookie-based
 
 async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
   const ctrl = new AbortController();
@@ -118,6 +109,7 @@ function srcLabel(src) {
 }
 
 export default function SummeryPage() {
+  const { employee } = useAuth();
   const today = toLocalYMD(new Date());
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
@@ -192,7 +184,6 @@ export default function SummeryPage() {
   // Load opening values from backend sheet for the selected range
   useEffect(() => {
     let cancelled = false;
-    const token = getToken();
 
     (async () => {
       setOpenInfoStatus("loading");
@@ -205,7 +196,6 @@ export default function SummeryPage() {
               const { res, data } = await fetchJsonWithTimeout(
                 url(`/api/cash/today?date=${encodeURIComponent(k)}`),
                 {
-                  headers: token ? { Authorization: `Bearer ${token}` } : undefined,
                   cache: "no-store",
                   credentials: "include",
                 },
@@ -361,7 +351,7 @@ export default function SummeryPage() {
           source,
           amount,
           note: wReason || '',
-          createdBy: localStorage.getItem('user') || ''
+          createdBy: employee?.name || employee?.username || ''
         }),
       });
       const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();

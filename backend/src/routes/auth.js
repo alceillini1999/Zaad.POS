@@ -1,6 +1,7 @@
 const express = require("express");
 const { readRows } = require("../google/sheets.repo.js");
 const { createSession } = require("../auth/sessions.js");
+const requireAuth = require("../middlewares/requireAuth.js");
 
 const router = express.Router();
 
@@ -72,8 +73,17 @@ router.post("/login", async (req, res) => {
       ttlHours: 12,
     });
 
+    // Store token in an httpOnly cookie so the client doesn't need browser storage
+    const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+    res.cookie("zaad_token", session.token, {
+      httpOnly: true,
+      secure: isProd, // set true on HTTPS (Render)
+      sameSite: "lax",
+      maxAge: 12 * 60 * 60 * 1000,
+      path: "/",
+    });
+
     return res.json({
-      token: session.token,
       employee: {
         id: emp.id || emp.employeeid || emp.employeeId || emp.username,
         name: emp.name || emp.username,
@@ -88,6 +98,29 @@ router.post("/login", async (req, res) => {
       details: e?.message || String(e),
     });
   }
+});
+
+// Read current session (via cookie or Authorization header)
+router.get("/me", requireAuth, async (req, res) => {
+  const s = req.session || {};
+  return res.json({
+    ok: true,
+    employee: {
+      id: s.employeeId || s.employeeid || "",
+      name: s.employeeName || s.employeename || "",
+      role: s.role || "staff",
+    },
+    session: {
+      createdAt: s.createdAt || s.createdat || "",
+      expiresAt: s.expiresAt || s.expiresat || "",
+    },
+  });
+});
+
+router.post("/logout", async (_req, res) => {
+  res.clearCookie("zaad_token", { path: "/" });
+  res.clearCookie("token", { path: "/" });
+  return res.json({ ok: true });
 });
 
 module.exports = router;

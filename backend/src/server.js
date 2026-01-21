@@ -4,6 +4,7 @@ try { require('dotenv').config(); dotenvLoaded = true; } catch { console.log('do
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
@@ -48,6 +49,9 @@ app.options('*', cors());
 
 // JSON
 app.use(express.json());
+
+// Cookies (for httpOnly auth)
+app.use(cookieParser());
 
 // Health
 app.get('/api/healthz', (req, res) =>

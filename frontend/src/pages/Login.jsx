@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../api/api";
 
 export default function Login() {
   const nav = useNavigate();
@@ -21,9 +22,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const r = await fetch(`${API_URL}/auth/login`, {
+      await api(`${API_URL}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         cache: "no-store",
         body: JSON.stringify({
           username: String(username || "").trim(),
@@ -31,11 +31,7 @@ export default function Login() {
         }),
       });
 
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data?.error || data?.message || "Login failed");
-
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("employee", JSON.stringify(data.employee || {}));
+      // Token is stored server-side in an httpOnly cookie.
       nav("/overview");
     } catch (e2) {
       setErr(e2.message || "Login failed");

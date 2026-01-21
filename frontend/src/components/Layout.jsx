@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAuth } from "../context/AuthContext";
 
 /**
  * Layout (Full Redesign)
@@ -107,23 +108,7 @@ function getTitle(pathname) {
   return hit?.label || "Dashboard";
 }
 
-function getEmployeeName() {
-  try {
-    const raw = localStorage.getItem("employee");
-    const emp = raw ? JSON.parse(raw) : null;
-    return emp?.name || emp?.username || "Employee";
-  } catch {
-    return "Employee";
-  }
-}
-
-function clearSession() {
-  try {
-    localStorage.removeItem("token");
-    localStorage.removeItem("employee");
-    localStorage.removeItem("dayOpen");
-  } catch {}
-}
+// Auth is cookie-based; employee info is provided by AuthContext.
 
 function SideLink({ to, label, iconKey, onNavigate }) {
   return (
@@ -194,12 +179,13 @@ export default function Layout({ children }) {
   const nav = useNavigate();
   const [drawer, setDrawer] = React.useState(false);
 
+  const { employee: authedEmployee, logout: doLogout } = useAuth();
+
   const pageTitle = React.useMemo(() => getTitle(pathname), [pathname]);
-  const employee = React.useMemo(() => getEmployeeName(), []);
+  const employee = authedEmployee?.name || authedEmployee?.username || "Employee";
 
   const logout = () => {
-    clearSession();
-    nav("/login");
+    doLogout().finally(() => nav("/login"));
   };
 
   const Sidebar = (

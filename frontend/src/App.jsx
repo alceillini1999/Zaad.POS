@@ -24,45 +24,11 @@ import DeliveryPage from './pages/DeliveryPage'
 import ClientsPage from './pages/ClientsPage'
 import WhatsAppPage from './pages/WhatsAppPage'
 import SummeryPage from './pages/SummeryPage'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
 /* ======================
-   Helpers / Session
+   Helpers
 ====================== */
-function getToken() {
-  try {
-    return localStorage.getItem('token') || ''
-  } catch {
-    return ''
-  }
-}
-function getEmployee() {
-  try {
-    const raw = localStorage.getItem('employee')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-function clearSession() {
-  try {
-    localStorage.removeItem('token')
-    localStorage.removeItem('employee')
-    localStorage.removeItem('dayOpen')
-  } catch {}
-}
-function setDayOpen(day) {
-  try {
-    localStorage.setItem('dayOpen', JSON.stringify(day))
-  } catch {}
-}
-function getDayOpen() {
-  try {
-    const raw = localStorage.getItem('dayOpen')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
 function getLocalDateISO() {
   const d = new Date()
   // local YYYY-MM-DD
@@ -126,44 +92,23 @@ function DayOpenedRoute({ children }) {
 
     async function check() {
       const today = getLocalDateISO()
-      const day = getDayOpen()
-
-      if (day && day.date === today) {
-        if (!cancelled) setStatus('ok')
-        return
-      }
 
       try {
         const { res: r, data } = await fetchJsonWithTimeout(
           `/api/cash/today?date=${encodeURIComponent(today)}`,
           {
-            headers: { Authorization: `Bearer ${getToken()}` },
             cache: 'no-store',
+            credentials: 'include',
           },
           2500
         )
 
         if (r.status === 401 || r.status === 403) {
-          clearSession()
           if (!cancelled) setStatus('login')
           return
         }
 
-        if (r.ok && data?.found && data?.row) {
-          const row = data.row
-          const loaded = {
-            date: today,
-            openId: row.openId || row.openID || '',
-            openedAt: row.openedAt || '',
-            openingCashTotal: Number(row.openingCashTotal || 0),
-            openingTillTotal: Number(row.openingTillTotal || 0),
-            cashBreakdown: Array.isArray(row.cashBreakdown) ? row.cashBreakdown : [],
-            tillNo: String(row.tillNo || ''),
-            mpesaWithdrawal: Number(row.mpesaWithdrawal ?? row.withdrawalCash ?? 0),
-            withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
-            sendMoney: Number(row.sendMoney || 0),
-          }
-          setDayOpen(loaded)
+        if (r.ok && data?.found) {
           if (!cancelled) setStatus('ok')
           return
         }
@@ -232,14 +177,11 @@ function parseNonNegNumber(v) {
    - End Day: enter evening cash + Save & logout
 ====================== */
 function CashPage() {
-
-  const token = getToken()
-  if (!token) return <Navigate to="/login" replace />
-
+  const { employee, logout: doLogout } = useAuth()
   const today = getLocalDateISO()
 
   // Keep a local state copy so UI updates immediately after Start/End Day
-  const [dayOpenState, setDayOpenState] = useState(() => getDayOpen())
+  const [dayOpenState, setDayOpenState] = useState(null)
   const isOpenedToday = !!dayOpenState && dayOpenState.date === today
 
   const [counts, setCounts] = useState(buildInitialCounts())
@@ -258,7 +200,7 @@ function CashPage() {
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
 
-  // If localStorage was cleared, but the day is already opened in backend, load it automatically
+  // If the day is already opened in backend, load it automatically
   useEffect(() => {
     let cancelled = false
 
@@ -268,8 +210,8 @@ function CashPage() {
         const { res: r, data } = await fetchJsonWithTimeout(
           `/api/cash/today?date=${encodeURIComponent(today)}`,
           {
-            headers: { Authorization: `Bearer ${getToken()}` },
             cache: 'no-store',
+            credentials: 'include',
           },
           2500
         )
@@ -289,7 +231,6 @@ function CashPage() {
           sendMoney: Number(row.sendMoney || 0),
         }
 
-        setDayOpen(loaded)
         if (!cancelled) setDayOpenState(loaded)
       } catch {
         // ignore
@@ -370,7 +311,7 @@ function CashPage() {
         mpesaWithdrawal: withdrawalNum,
         withdrawalCash: withdrawalNum,
         sendMoney: sendMoneyNum,
-        employee: getEmployee(),
+        employee: employee?.name || employee?.username || '',
         openedAt: new Date().toISOString(),
       }
 
@@ -378,9 +319,9 @@ function CashPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
         },
         cache: 'no-store',
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
 
@@ -392,8 +333,8 @@ function CashPage() {
             const { res: rr, data: dd } = await fetchJsonWithTimeout(
               `/api/cash/today?date=${encodeURIComponent(today)}`,
               {
-                headers: { Authorization: `Bearer ${getToken()}` },
                 cache: 'no-store',
+                credentials: 'include',
               },
               2500
             )
@@ -411,7 +352,6 @@ function CashPage() {
                 withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
                 sendMoney: Number(row.sendMoney || 0),
               }
-              setDayOpen(loaded)
               setDayOpenState(loaded)
               setOk('Start Day already saved for today. Loaded existing record.')
               return
@@ -434,7 +374,6 @@ function CashPage() {
         openedAt: payload.openedAt,
       }
 
-      setDayOpen(newDay)
       setDayOpenState(newDay)
       setOk('Start Day saved successfully.')
     } catch (e2) {
@@ -473,7 +412,7 @@ function CashPage() {
         mpesaWithdrawal: withdrawalNum,
         withdrawalCash: withdrawalNum,
         sendMoney: sendMoneyNum,
-        employee: getEmployee(),
+        employee: employee?.name || employee?.username || '',
         closedAt: new Date().toISOString(),
       }
 
@@ -481,16 +420,16 @@ function CashPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
         },
         cache: 'no-store',
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
 
       const data = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(data?.error || 'Failed to save End Day.')
 
-      clearSession()
+      await doLogout()
       setDayOpenState(null)
       nav('/login', { replace: true })
     } catch (e2) {
@@ -648,216 +587,6 @@ function CashPage() {
 }
 
 /* ======================
-   End Day Modal (kept)
-   (no longer used since we removed floating button)
-====================== */
-function EndDayModal({ open, onClose }) {
-
-  const [counts, setCounts] = useState(buildInitialCounts())
-  const [tillNo, setTillNo] = useState('')
-  const [closingTillTotal, setClosingTillTotal] = useState('0')
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState('')
-
-  // Prefill Till No from Start Day when modal opens
-  useEffect(() => {
-    if (!open) return
-    const day = getDayOpen()
-    if (day?.tillNo && !tillNo) setTillNo(String(day.tillNo))
-  }, [open]) // intentionally not depending on tillNo to avoid re-running
-
-  const closingTotal = useMemo(() => {
-    let sum = 0
-    for (const d of DENOMS) {
-      const c = parseNonNegInt(counts[d])
-      if (c === null) return null
-      sum += d * c
-    }
-    return sum
-  }, [counts])
-
-  const onCountChange = (denom, value) => {
-    if (value !== '' && !/^\d+$/.test(value)) return
-    setCounts((prev) => ({ ...prev, [denom]: value }))
-  }
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setErr('')
-    setLoading(true)
-
-    try {
-      if (closingTotal === null) throw new Error('Invalid cash counts (must be whole numbers).')
-      if (!tillNo.trim()) throw new Error('Till No is required.')
-
-      const withdrawNum = Number(closingTillTotal || 0)
-      if (!Number.isFinite(withdrawNum) || withdrawNum < 0) {
-        throw new Error('Invalid Closing Till amount.')
-      }
-
-      const day = getDayOpen()
-      const today = getLocalDateISO()
-
-      const breakdown = DENOMS.map((d) => ({
-        denom: d,
-        count: parseNonNegInt(counts[d]) ?? 0,
-        amount: d * (parseNonNegInt(counts[d]) ?? 0),
-      }))
-
-      const payload = {
-        date: today,
-        openId: day?.openId || null,
-        closingCashTotal: closingTotal,
-        cashBreakdown: breakdown,
-        tillNo: tillNo.trim(),
-        closingTillTotal: withdrawNum,
-        employee: getEmployee(),
-        closedAt: new Date().toISOString(),
-      }
-
-      const r = await fetch('/api/cash/close', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
-        cache: 'no-store',
-        body: JSON.stringify(payload),
-      })
-
-      const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data?.error || 'Failed to save End Day.')
-
-      clearSession()
-      onClose?.()
-      nav('/login', { replace: true })
-    } catch (e2) {
-      setErr(e2.message || 'Failed to save End Day.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (!open) return null
-
-  return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.45)' }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl bg-white rounded-2xl p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-lg font-bold mb-2">End Day</h3>
-        <p className="text-sm text-[#555] mb-4">Count closing cash, then save.</p>
-
-        <form onSubmit={submit} className="space-y-4">
-          <div className="bg-black/5 rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold">Cash Count</div>
-              <div className="text-sm">
-                Total:{' '}
-                <span className="font-bold">
-                  {closingTotal === null ? '—' : `KSh ${closingTotal}`}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {DENOMS.map((d) => (
-                <div key={d} className="flex items-center gap-3">
-                  <div className="w-24 font-semibold">KSh {d}</div>
-                  <input
-                    className="w-32"
-                    value={counts[d]}
-                    onChange={(e) => onCountChange(d, e.target.value)}
-                    inputMode="numeric"
-                    placeholder="Count"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-semibold mb-1">Till No</label>
-              <input
-                className="w-full"
-                value={tillNo}
-                onChange={(e) => setTillNo(e.target.value)}
-                placeholder="e.g., TILL-1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Closing Till Amount</label>
-              <input
-                className="w-full"
-                value={closingTillTotal}
-                onChange={(e) => setClosingTillTotal(e.target.value)}
-                inputMode="numeric"
-                placeholder="0"
-              />
-            </div>
-          </div>
-
-          {err && <div className="text-sm text-red-600">{err}</div>}
-
-          <div className="flex items-center justify-end gap-2">
-            <button disabled={loading} className="btn-gold" type="submit">
-              {loading ? 'Saving...' : 'Save & End Day'}
-            </button>
-            <button
-              type="button"
-              className="px-4 py-2 rounded-xl border border-[#ddd] text-[#111]"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-/* ======================
-   Floating End Day Control (kept but NOT rendered now)
-====================== */
-function EndDayFloatingControl() {
-  const location = useLocation()
-  const [open, setOpen] = useState(false)
-
-  const token = getToken()
-  const day = getDayOpen()
-  const today = getLocalDateISO()
-
-  const isLogin = location.pathname === '/login'
-  const isCash = location.pathname === '/cash'
-
-  const canShow = !!token && day && day.date === today && !isLogin && !isCash
-  if (!canShow) return null
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-[9998] px-4 py-3 rounded-2xl shadow-lg border border-[#eee] 
-        bg-white text-[#111] hover:bg-[#f7f7f7] font-semibold"
-      >
-        End Day
-      </button>
-      <EndDayModal open={open} onClose={() => setOpen(false)} />
-    </>
-  )
-}
-
-/* ======================
    Routes
 ====================== */
 function RoutedPages() {
@@ -869,8 +598,8 @@ function RoutedPages() {
     const ping = async () => {
       try {
         await fetch('/api/healthz', {
-          headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
           cache: 'no-store',
+          credentials: 'include',
         })
       } catch {
         // ignore
@@ -1093,7 +822,9 @@ function AppShell() {
 export default function App() {
   return (
     <Router>
-      <AppShell />
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
     </Router>
   )
 }

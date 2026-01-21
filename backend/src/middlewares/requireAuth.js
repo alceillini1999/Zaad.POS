@@ -3,7 +3,9 @@ const { getSessionByToken, isSessionValid } = require("../auth/sessions.js");
 module.exports = async function requireAuth(req, res, next) {
   try {
     const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+    const cookieToken = req.cookies?.zaad_token || req.cookies?.token || "";
+    const token = bearer || cookieToken;
 
     if (!token) return res.status(401).json({ error: "Missing token" });
 

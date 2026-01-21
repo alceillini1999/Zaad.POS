@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 // Simple manager gate for sensitive pages.
 // IMPORTANT: This version DOES NOT persist unlock state.
@@ -16,15 +17,11 @@ export default function ManagerRoute({ children }) {
     return (import.meta.env.VITE_MANAGER_PIN || '0000').toString()
   }, [])
 
-  // Require login session first
-  const token = (() => {
-    try {
-      return localStorage.getItem('token') || ''
-    } catch {
-      return ''
-    }
-  })()
-  if (!token) return <Navigate to="/login" replace />
+  const { employee, loading } = useAuth()
+  if (loading) return (
+    <div className="p-6"><div className="ui-card p-4">Loading session…</div></div>
+  )
+  if (!employee) return <Navigate to="/login" replace />
 
   if (unlocked) return children
 

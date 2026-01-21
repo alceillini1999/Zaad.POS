@@ -61,14 +61,6 @@ const parseYMDLocal = (s) => {
 
 const fmtD = (d) => toLocalYMD(d);
 
-function getToken() {
-  try {
-    return localStorage.getItem("token") || "";
-  } catch {
-    return "";
-  }
-}
-
 async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -104,7 +96,7 @@ export default function OverviewPage() {
   // Cashier (single day)
   const [openInfo, setOpenInfo] = useState(null);
   const [openInfoStatus, setOpenInfoStatus] = useState("idle"); // idle | loading | ok | timeout | error
-  const [withdrawals, setWithdrawals] = useState([]); // local-only manual withdrawals (single day)
+  const [withdrawals, setWithdrawals] = useState([]); // manual withdrawals from Google Sheet (single day)
 
   useEffect(() => {
     (async () => {
@@ -128,20 +120,23 @@ export default function OverviewPage() {
   const oneDay = true;
   const dayKey = reportDate;
 
-  // Load manual withdrawals for selected single day (local only)
-  const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
   useEffect(() => {
     if (!oneDay) {
       setWithdrawals([]);
       return;
     }
-    try {
-      const raw = localStorage.getItem(lsKey("withdrawals", dayKey));
-      const list = raw ? JSON.parse(raw) : [];
-      setWithdrawals(Array.isArray(list) ? list : []);
-    } catch {
-      setWithdrawals([]);
-    }
+    (async () => {
+      try {
+        const res = await fetch(
+          url(`/api/manual-withdrawals?from=${encodeURIComponent(dayKey)}&to=${encodeURIComponent(dayKey)}`),
+          { credentials: "include", cache: "no-store" }
+        );
+        const data = await res.json().catch(() => ([]));
+        setWithdrawals(Array.isArray(data) ? data : []);
+      } catch {
+        setWithdrawals([]);
+      }
+    })();
   }, [oneDay, dayKey]);
 
   const withdrawalManual = useMemo(() => {
@@ -162,26 +157,6 @@ export default function OverviewPage() {
     }
 
     let cancelled = false;
-    const token = getToken();
-
-    // Immediate best-effort from localStorage dayOpen (often today)
-    try {
-      const raw = localStorage.getItem("dayOpen");
-      const d = raw ? JSON.parse(raw) : null;
-      if (d && String(d.date) === String(dayKey)) {
-        setOpenInfo({
-          found: true,
-          date: dayKey,
-          openId: d.openId || "",
-          openedAt: d.openedAt || "",
-          tillNo: d.tillNo || "",
-          openingCashTotal: Number(d.openingCashTotal || 0),
-          openingTillTotal: Number(d.openingTillTotal || 0),
-          withdrawalCash: Number(d.withdrawalCash ?? d.mpesaWithdrawal ?? 0),
-          sendMoney: Number(d.sendMoney || 0),
-        });
-      }
-    } catch {}
 
     (async () => {
       setOpenInfoStatus("loading");
@@ -189,7 +164,6 @@ export default function OverviewPage() {
         const { res, data } = await fetchJsonWithTimeout(
           url(`/api/cash/today?date=${encodeURIComponent(dayKey)}`),
           {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             cache: "no-store",
             credentials: "include",
           },
