@@ -32,8 +32,9 @@ router.get('/', async (req, res) => {
 router.post('/google', async (req, res) => {
   try {
     const { phone, name, address='', loyaltyPoints=0, notes='' } = req.body || {};
-    if (!phone || !name) return res.status(400).json({ error: 'phone and name are required' });
-    await appendRow(SHEET_ID, TAB, [String(phone), name, address, Number(loyaltyPoints), notes]);
+    if (!phone) return res.status(400).json({ error: 'phone is required' });
+    const safeName = String(name || '').trim() || String(phone);
+    await appendRow(SHEET_ID, TAB, [String(phone), safeName, address, Number(loyaltyPoints), notes]);
     res.json({ ok: true });
   } catch (e) {
     console.error('POST client:', e?.message || e);
@@ -49,7 +50,8 @@ router.put('/google/:phone', async (req, res) => {
     if (rowIdx1 < 0) return res.status(404).json({ error: 'Client not found' });
 
     const { phone=key, name, address='', loyaltyPoints=0, notes='' } = req.body || {};
-    await updateRow(SHEET_ID, TAB, rowIdx1, [String(phone), name, address, Number(loyaltyPoints), notes]);
+    const safeName = String(name || '').trim() || String(phone);
+    await updateRow(SHEET_ID, TAB, rowIdx1, [String(phone), safeName, address, Number(loyaltyPoints), notes]);
     res.json({ ok: true });
   } catch (e) {
     console.error('PUT client:', e?.message || e);

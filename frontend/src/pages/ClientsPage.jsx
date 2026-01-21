@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import Section from '../components/Section'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
@@ -15,14 +16,32 @@ async function api(p, opts={}) {
 }
 
 export default function ClientsPage() {
+  const location = useLocation();
   const [rows, setRows] = useState([])
   const [q, setQ]       = useState('')
   const [modal, setModal] = useState({ open:false, edit:null })
+
+  const didApplyQuery = useRef(false);
 
   async function load(){
     const out = await api('/api/clients');
     const list = Array.isArray(out?.data) ? out.data : (Array.isArray(out)? out : []);
     setRows(list);
+
+    // If opened from POS with ?phone=..., prefill search and optionally open Add modal
+    if (!didApplyQuery.current) {
+      didApplyQuery.current = true;
+      const params = new URLSearchParams(location.search || "");
+      const phoneParam = (params.get('phone') || '').trim();
+      if (phoneParam) {
+        setQ(phoneParam);
+        const exists = list.some(r => String(r.phone || '') === phoneParam);
+        if (!exists) {
+          // Open Add Client with phone prefilled (name can be edited later)
+          setModal({ open:true, edit:{ phone: phoneParam, name: phoneParam, address:'', loyaltyPoints:0, notes:'' } });
+        }
+      }
+    }
   }
   useEffect(()=>{ load().catch(e=>alert(e.message)) }, [])
 
