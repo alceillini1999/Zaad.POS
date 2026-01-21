@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Section from "../components/Section";
 import Card from "../components/Card";
 
@@ -59,10 +60,15 @@ function QtyControl({ value, onChange, onInc, onDec }) {
 }
 
 export default function POSPage() {
+  const nav = useNavigate();
   const [products, setProducts] = useState([]);
   const [clients, setClients] = useState([]);
   const [cart, setCart] = useState([]);
   const [client, setClient] = useState(null);
+
+  // Sale type: pay now OR delivery (pay later)
+  const [saleType, setSaleType] = useState("now"); // 'now' | 'delivery'
+  const [deliveryNote, setDeliveryNote] = useState("");
 
   // طرق الدفع: cash / till / withdrawal
   const [payment, setPayment] = useState("cash");
@@ -127,7 +133,7 @@ export default function POSPage() {
       alert("Cart is empty");
       return;
     }
-    if (payment === "cash" && Number(received || 0) < total) {
+    if (saleType === "now" && payment === "cash" && Number(received || 0) < total) {
       alert("Received is less than total");
       return;
     }
@@ -151,11 +157,41 @@ export default function POSPage() {
       total,
       profit: items.reduce((s, i) => s + (Number(i.price) - Number(i.cost)) * Number(i.qty), 0),
       addPoints: Number(addPoints || 0),
-      received: payment === "cash" ? Number(received || 0) : 0,
-      change: payment === "cash" ? change : 0,
+      received: saleType === "now" && payment === "cash" ? Number(received || 0) : 0,
+      change: saleType === "now" && payment === "cash" ? change : 0,
     };
 
     try {
+      if (saleType === "delivery") {
+        // Create unpaid delivery order
+        const res = await fetch(url("/api/delivery"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderNo: payload.invoiceNo,
+            clientName: payload.clientName,
+            clientPhone: payload.clientPhone,
+            items: payload.items,
+            total: payload.total,
+            profit: payload.profit,
+            note: String(deliveryNote || ""),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+
+        alert(["Delivery order created ✅", `Client: ${payload.clientName || "—"}`, `Items: ${items.length}`, `Total: ${K(total)}`].join("\n"));
+        setCart([]);
+        setDiscount(0);
+        setAddPoints(0);
+        setReceived(0);
+        setClient(null);
+        setDeliveryNote("");
+        nav("/delivery");
+        return;
+      }
+
+      // Normal sale (pay now)
       const res = await fetch(url("/api/sales/google"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -172,7 +208,7 @@ export default function POSPage() {
       setReceived(0);
       setClient(null);
     } catch (e) {
-      alert("Failed to confirm purchase:\n" + e.message);
+      alert("Failed to confirm purchase:\n" + (e?.message || e));
     }
   }
 
@@ -183,7 +219,9 @@ export default function POSPage() {
           <div className="ui-h1">POS</div>
           <div className="ui-sub mt-1">Search products, build cart, and complete sale.</div>
         </div>
-        <div className="ui-badge">Payment: <b className="ml-1">{payment}</b></div>
+        <div className="ui-badge">
+          Type: <b className="ml-1">{saleType === "delivery" ? "Delivery" : "Pay now"}</b>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -266,6 +304,35 @@ export default function POSPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="ui-card p-3">
+                  <div className="text-xs font-bold uppercase tracking-wider text-mute">Sale Type</div>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      className={
+                        "ui-btn flex-1 " +
+                        (saleType === "now" ? "ui-btn-primary" : "ui-btn-ghost")
+                      }
+                      onClick={() => setSaleType("now")}
+                    >
+                      Pay Now
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        "ui-btn flex-1 " +
+                        (saleType === "delivery" ? "ui-btn-primary" : "ui-btn-ghost")
+                      }
+                      onClick={() => setSaleType("delivery")}
+                    >
+                      Delivery
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-mute">
+                    Delivery orders are unpaid. Mark as paid later in <b>Delivery</b> page.
+                  </div>
+                </div>
+
                 <label className="block">
                   <span className="ui-label">Discount (amount)</span>
                   <input
@@ -276,28 +343,53 @@ export default function POSPage() {
                     onChange={(e) => setDiscount(Number(e.target.value || 0))}
                   />
                 </label>
-                <label className="block">
-                  <span className="ui-label">Payment</span>
-                  <select className="ui-select mt-1" value={payment} onChange={(e) => setPayment(e.target.value)}>
-                    <option value="cash">Cash</option>
-                    <option value="till">Till</option>
-                    <option value="withdrawal">Withdrawal</option>
-                  </select>
-                </label>
               </div>
 
-              {payment === "cash" && (
+              {saleType === "now" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="ui-label">Received</span>
-                    <input
-                      type="number"
-                      min="0"
-                      className="ui-input mt-1"
-                      value={received}
-                      onChange={(e) => setReceived(Number(e.target.value || 0))}
-                    />
+                    <span className="ui-label">Payment</span>
+                    <select className="ui-select mt-1" value={payment} onChange={(e) => setPayment(e.target.value)}>
+                      <option value="cash">Cash</option>
+                      <option value="till">Till</option>
+                      <option value="withdrawal">Withdrawal</option>
+                    </select>
                   </label>
+
+                  {payment === "cash" ? (
+                    <label className="block">
+                      <span className="ui-label">Received</span>
+                      <input
+                        type="number"
+                        min="0"
+                        className="ui-input mt-1"
+                        value={received}
+                        onChange={(e) => setReceived(Number(e.target.value || 0))}
+                      />
+                    </label>
+                  ) : (
+                    <div className="ui-card p-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-mute">Received</div>
+                      <div className="mt-2 text-sm text-mute">Not required for non-cash methods</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {saleType === "delivery" && (
+                <label className="block">
+                  <span className="ui-label">Delivery Note (optional)</span>
+                  <input
+                    className="ui-input mt-1"
+                    placeholder="Address / rider / phone details…"
+                    value={deliveryNote}
+                    onChange={(e) => setDeliveryNote(e.target.value)}
+                  />
+                </label>
+              )}
+
+              {saleType === "now" && payment === "cash" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Card title="Change" value={K(change)} subtitle="Cash only" />
                 </div>
               )}
@@ -344,7 +436,7 @@ export default function POSPage() {
               </div>
 
               <button className="ui-btn ui-btn-primary w-full" onClick={confirmPurchase} type="button">
-                Complete Sale
+                {saleType === "delivery" ? "Send to Delivery" : "Complete Sale"}
               </button>
             </div>
           </Section>

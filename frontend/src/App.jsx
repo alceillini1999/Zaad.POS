@@ -20,6 +20,7 @@ import ProductsPage from './pages/ProductsPage'
 import ExpensesPage from './pages/ExpensesPage'
 import SalesPage from './pages/SalesPage'
 import POSPage from './pages/POSPage'
+import DeliveryPage from './pages/DeliveryPage'
 import ClientsPage from './pages/ClientsPage'
 import WhatsAppPage from './pages/WhatsAppPage'
 import SummeryPage from './pages/SummeryPage'
@@ -989,6 +990,21 @@ function RoutedPages() {
                 <PageWrapper>
                   <div className="space-y-6">
                     <POSPage />
+                  </div>
+                </PageWrapper>
+              </DayOpenedRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/delivery"
+          element={
+            <ProtectedRoute>
+              <DayOpenedRoute>
+                <PageWrapper>
+                  <div className="space-y-6">
+                    <DeliveryPage />
                   </div>
                 </PageWrapper>
               </DayOpenedRoute>
