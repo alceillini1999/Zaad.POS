@@ -68,6 +68,9 @@ app.get('/api/healthz', (req, res) =>
   app.use('/api/expenses', await loadRouter('./routes/expenses'));
   app.use('/api/sales',    await loadRouter('./routes/sales'));
 
+  // ✅ Delivery Orders (unpaid) -> mark paid -> normal sale
+  app.use('/api/delivery', await loadRouter('./routes/delivery'));
+
   // ✅ NEW: Cash routes (Start Day / End Day)
   app.use('/api/cash',     await loadRouter('./routes/cash'));
 

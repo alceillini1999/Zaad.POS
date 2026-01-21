@@ -102,15 +102,33 @@ export default function SummeryPage() {
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
-  // Cashier opening values (single day)
-  const [openInfo, setOpenInfo] = useState(null);
+  // Cashier opening values (range)
+  // Map: { [dateYMD]: { found, row } }
+  const [openMap, setOpenMap] = useState({});
   const [openInfoStatus, setOpenInfoStatus] = useState("idle"); // idle | loading | ok | timeout | error
 
-  // Manual withdrawals with details (single day)
+  // Manual withdrawals with details (range)
   const [withdrawals, setWithdrawals] = useState([]);
   const [wAmount, setWAmount] = useState("");
   const [wSource, setWSource] = useState("cash");
   const [wReason, setWReason] = useState("");
+  const [wDate, setWDate] = useState(today);
+
+  const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
+
+  const dateKeysInRange = useMemo(() => {
+    const keys = [];
+    const a = startOfDay(parseYMDLocal(fromDate));
+    const b = startOfDay(parseYMDLocal(toDate));
+    const from = a <= b ? a : b;
+    const to = a <= b ? b : a;
+    const cur = new Date(from);
+    while (cur <= to) {
+      keys.push(fmtD(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return keys;
+  }, [fromDate, toDate]);
 
   useEffect(() => {
     (async () => {
@@ -133,95 +151,65 @@ export default function SummeryPage() {
 
   const dFrom = useMemo(() => startOfDay(parseYMDLocal(fromDate)), [fromDate]);
   const dTo = useMemo(() => endOfDay(parseYMDLocal(toDate)), [toDate]);
-  const isSingleDay = useMemo(() => sameDay(dFrom, dTo), [dFrom, dTo]);
-  const dayKey = useMemo(() => fmtD(dFrom), [dFrom]);
+  const isSingleDay = useMemo(() => dateKeysInRange.length === 1, [dateKeysInRange]);
 
-  // Load manual withdrawals for selected single day (local only)
-  const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
+  // Load manual withdrawals for selected range (local only)
   useEffect(() => {
-    if (!isSingleDay) {
-      setWithdrawals([]);
-      return;
-    }
     try {
-      const raw = localStorage.getItem(lsKey("withdrawals", dayKey));
-      const list = raw ? JSON.parse(raw) : [];
-      setWithdrawals(Array.isArray(list) ? list : []);
+      const all = [];
+      for (const k of dateKeysInRange) {
+        const raw = localStorage.getItem(lsKey("withdrawals", k));
+        const list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) continue;
+        for (const w of list) {
+          all.push({ ...w, dateKey: w.dateKey || k });
+        }
+      }
+      // newest first
+      all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setWithdrawals(all);
     } catch {
       setWithdrawals([]);
     }
-  }, [isSingleDay, dayKey]);
+  }, [dateKeysInRange]);
 
+  // Load opening values from backend sheet for the selected range
   useEffect(() => {
-    if (!isSingleDay) return;
-    try {
-      localStorage.setItem(lsKey("withdrawals", dayKey), JSON.stringify(withdrawals || []));
-    } catch {}
-  }, [withdrawals, isSingleDay, dayKey]);
-
-  // Load opening values from Cash page / backend sheet (single day)
-  useEffect(() => {
-    if (!isSingleDay) {
-      setOpenInfo(null);
-      setOpenInfoStatus("idle");
-      return;
-    }
-
     let cancelled = false;
     const token = getToken();
-
-    // Immediate best-effort from localStorage dayOpen
-    try {
-      const raw = localStorage.getItem("dayOpen");
-      const d = raw ? JSON.parse(raw) : null;
-      if (d && String(d.date) === String(dayKey)) {
-        setOpenInfo({
-          found: true,
-          date: dayKey,
-          openId: d.openId || "",
-          openedAt: d.openedAt || "",
-          tillNo: d.tillNo || "",
-          openingCashTotal: Number(d.openingCashTotal || 0),
-          openingTillTotal: Number(d.openingTillTotal || 0),
-          withdrawalCash: Number(d.withdrawalCash ?? d.mpesaWithdrawal ?? 0),
-          sendMoney: Number(d.sendMoney || 0),
-        });
-      }
-    } catch {}
 
     (async () => {
       setOpenInfoStatus("loading");
       try {
-        const { res, data } = await fetchJsonWithTimeout(
-          url(`/api/cash/today?date=${encodeURIComponent(dayKey)}`),
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            cache: "no-store",
-            credentials: "include",
-          },
-          2500
+        // Prevent overly heavy fan-out requests.
+        const keys = dateKeysInRange.slice(0, 31);
+        const pairs = await Promise.all(
+          keys.map(async (k) => {
+            try {
+              const { res, data } = await fetchJsonWithTimeout(
+                url(`/api/cash/today?date=${encodeURIComponent(k)}`),
+                {
+                  headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                  cache: "no-store",
+                  credentials: "include",
+                },
+                2500
+              );
+              if (res.ok && data?.found && data?.row) {
+                return [k, { found: true, row: data.row }];
+              }
+              return [k, { found: false, row: null }];
+            } catch (e) {
+              if (e?.name === "AbortError") return [k, { found: false, row: null, timeout: true }];
+              return [k, { found: false, row: null, error: true }];
+            }
+          })
         );
 
         if (cancelled) return;
-
-        if (res.ok && data?.found && data?.row) {
-          const row = data.row;
-          setOpenInfo({
-            found: true,
-            date: dayKey,
-            openId: row.openId || row.openID || "",
-            openedAt: row.openedAt || "",
-            tillNo: String(row.tillNo || ""),
-            openingCashTotal: Number(row.openingCashTotal || 0),
-            openingTillTotal: Number(row.openingTillTotal || 0),
-            withdrawalCash: Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0),
-            sendMoney: Number(row.sendMoney || 0),
-          });
-          setOpenInfoStatus("ok");
-          return;
-        }
-
-        setOpenInfo(null);
+        const next = {};
+        for (const [k, v] of pairs) next[k] = v;
+        setOpenMap(next);
         setOpenInfoStatus("ok");
       } catch (e) {
         if (cancelled) return;
@@ -236,7 +224,26 @@ export default function SummeryPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSingleDay, dayKey]);
+  }, [dateKeysInRange]);
+
+  // Keep withdrawal date aligned with selection
+  useEffect(() => {
+    setWDate(toDate);
+  }, [toDate]);
+
+  const readWithdrawalsForKeys = (keys) => {
+    const all = [];
+    for (const k of keys) {
+      const raw = localStorage.getItem(lsKey("withdrawals", k));
+      const list = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(list)) continue;
+      for (const w of list) {
+        all.push({ ...w, dateKey: w.dateKey || k });
+      }
+    }
+    all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return all;
+  };
 
   const totals = useMemo(() => {
     const inRange = (t) => {
@@ -283,27 +290,34 @@ export default function SummeryPage() {
   }, [withdrawals]);
 
   const openings = useMemo(() => {
-    if (!isSingleDay || !openInfo?.found) return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0 };
-    return {
-      cash: Number(openInfo.openingCashTotal || 0),
-      till: Number(openInfo.openingTillTotal || 0),
-      withdrawal: Number(openInfo.withdrawalCash || 0),
-      sendMoney: Number(openInfo.sendMoney || 0),
-    };
-  }, [isSingleDay, openInfo]);
+    // Sum openings across the selected range (best-effort).
+    const keys = dateKeysInRange.slice(0, 31);
+    let cash = 0;
+    let till = 0;
+    let withdrawal = 0;
+    let sendMoney = 0;
+    for (const k of keys) {
+      const v = openMap?.[k];
+      const row = v?.row;
+      if (!v?.found || !row) continue;
+      cash += Number(row.openingCashTotal || 0);
+      till += Number(row.openingTillTotal || 0);
+      withdrawal += Number(row.withdrawalCash ?? row.mpesaWithdrawal ?? 0);
+      sendMoney += Number(row.sendMoney || 0);
+    }
+    return { cash, till, withdrawal, sendMoney };
+  }, [dateKeysInRange, openMap]);
 
   // Expected available (Opening + Sales - Manual Withdrawals)
   const expectedAvailable = useMemo(() => {
-    if (!isSingleDay) return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0, total: 0 };
     const cash = openings.cash + Number(totals.cashSales || 0) - Number(withdrawalManual.cash || 0);
     const till = openings.till + Number(totals.tillSales || 0) - Number(withdrawalManual.till || 0);
     const withdrawal = openings.withdrawal + Number(totals.withdrawalSales || 0) - Number(withdrawalManual.withdrawal || 0);
     const sendMoney = openings.sendMoney + Number(totals.sendMoneySales || 0) - Number(withdrawalManual.sendMoney || 0);
     return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
-  }, [isSingleDay, openings, totals, withdrawalManual]);
+  }, [openings, totals, withdrawalManual]);
 
   const projectedRemaining = useMemo(() => {
-    if (!isSingleDay) return { cash: 0, till: 0, withdrawal: 0, sendMoney: 0, total: 0 };
     const n = Number(String(wAmount || "").replace(/,/g, ""));
     const dec = Number.isFinite(n) && n > 0 ? n : 0;
     const next = {
@@ -326,7 +340,7 @@ export default function SummeryPage() {
       ...next,
       total: next.cash + next.till + next.withdrawal + next.sendMoney,
     };
-  }, [isSingleDay, expectedAvailable, wAmount, wSource]);
+  }, [expectedAvailable, wAmount, wSource]);
 
   const addWithdrawal = () => {
     const n = Number(String(wAmount || "").replace(/,/g, ""));
@@ -334,23 +348,56 @@ export default function SummeryPage() {
       alert("Please enter a valid withdrawal amount.");
       return;
     }
+    const k = String(wDate || "").trim();
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(k)) {
+      alert("Please select a valid withdrawal date.");
+      return;
+    }
     const entry = {
       id: `${Date.now()}`,
       createdAt: new Date().toISOString(),
+      dateKey: k,
       amount: n,
       source: wSource,
       reason: wReason || "",
     };
-    setWithdrawals((prev) => [entry, ...(prev || [])]);
+
+    try {
+      const raw = localStorage.getItem(lsKey("withdrawals", k));
+      const list = raw ? JSON.parse(raw) : [];
+      const next = Array.isArray(list) ? [entry, ...list] : [entry];
+      localStorage.setItem(lsKey("withdrawals", k), JSON.stringify(next));
+    } catch {}
+
+    // Re-read range to update UI
+    try {
+      setWithdrawals(readWithdrawalsForKeys(dateKeysInRange));
+    } catch {}
+
     setWAmount("");
     setWReason("");
   };
 
   const removeWithdrawal = (id) => {
-    setWithdrawals((prev) => (prev || []).filter((w) => w.id !== id));
+    const target = (withdrawals || []).find((w) => String(w.id) === String(id));
+    const k = target?.dateKey;
+    if (!k) {
+      setWithdrawals((prev) => (prev || []).filter((w) => w.id !== id));
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(lsKey("withdrawals", k));
+      const list = raw ? JSON.parse(raw) : [];
+      const next = Array.isArray(list) ? list.filter((w) => String(w.id) !== String(id)) : [];
+      localStorage.setItem(lsKey("withdrawals", k), JSON.stringify(next));
+    } catch {}
+    try {
+      setWithdrawals(readWithdrawalsForKeys(dateKeysInRange));
+    } catch {}
   };
 
   const withdrawalColumns = [
+    { key: "dateKey", header: "Date", render: (r) => r.dateKey || "—" },
     {
       key: "createdAt",
       header: "Time",
@@ -397,7 +444,7 @@ export default function SummeryPage() {
             <div className="text-xs font-bold uppercase tracking-wider text-mute">Mode</div>
             <div className="mt-1 font-extrabold text-ink">{isSingleDay ? "Single Day" : "Range"}</div>
             <div className="ui-sub mt-1">
-              To manage manual withdrawals, set <b>From = To</b>.
+              Manual withdrawals work for any selected range. When adding a withdrawal, choose its date.
             </div>
           </div>
         </div>
@@ -424,77 +471,79 @@ export default function SummeryPage() {
 
       {/* Manual withdrawals */}
       <Section title="Manual Withdrawals" subtitle="Money taken out during the day (record the source)" >
-        {!isSingleDay && (
-          <div className="ui-card p-4 text-sm text-mute">Manual withdrawals are available for single day only (set From = To).</div>
+        {(openInfoStatus === "timeout" || openInfoStatus === "error") && (
+          <div className="ui-card p-4 text-sm text-mute">
+            <b>Note:</b> Could not load opening values from the server ({openInfoStatus}). Expected balances may show 0 for opening amounts.
+          </div>
         )}
 
-        {isSingleDay && (
-          <>
-            {(openInfoStatus === "timeout" || openInfoStatus === "error") && (
-              <div className="ui-card p-4 text-sm text-mute">
-                <b>Note:</b> Could not load opening values from the server ({openInfoStatus}). Expected balances may show 0 for opening amounts.
-              </div>
-            )}
-
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-              <Card title="Expected Available (Cash)" value={K(expectedAvailable.cash)} subtitle="Opening + Sales - Manual" />
-              <Card title="Expected Available (Till)" value={K(expectedAvailable.till)} subtitle="Opening + Sales - Manual" />
-              <Card title="Expected Available (Withdrawal)" value={K(expectedAvailable.withdrawal)} subtitle="Opening + Sales - Manual" />
-              <Card title="Expected Available (Send Money)" value={K(expectedAvailable.sendMoney)} subtitle="Opening + Sales - Manual" />
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <div className="ui-badge">Total Expected: <b className="ml-1">{K(expectedAvailable.total)}</b></div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <label className="block">
-                <span className="ui-label">Amount</span>
-                <input className="ui-input mt-1" value={wAmount} onChange={(e) => setWAmount(e.target.value)} inputMode="numeric" placeholder="0" />
-              </label>
-              <label className="block">
-                <span className="ui-label">Source</span>
-                <select className="ui-select mt-1" value={wSource} onChange={(e) => setWSource(e.target.value)}>
-                  <option value="cash">Cash</option>
-                  <option value="till">Till</option>
-                  <option value="withdrawal">Withdrawal</option>
-                  <option value="send_money">Send Money</option>
-                </select>
-              </label>
-              <label className="block md:col-span-2">
-                <span className="ui-label">Reason</span>
-                <input className="ui-input mt-1" value={wReason} onChange={(e) => setWReason(e.target.value)} placeholder="e.g. supplier payment" />
-              </label>
-            </div>
-
-            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-4">
-              <Card title="Remaining After Entry (Cash)" value={K(projectedRemaining.cash)} subtitle="If you add this withdrawal" />
-              <Card title="Remaining After Entry (Till)" value={K(projectedRemaining.till)} subtitle="If you add this withdrawal" />
-              <Card title="Remaining After Entry (Withdrawal)" value={K(projectedRemaining.withdrawal)} subtitle="If you add this withdrawal" />
-              <Card title="Remaining After Entry (Send Money)" value={K(projectedRemaining.sendMoney)} subtitle="If you add this withdrawal" />
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <div className="ui-badge">Total Remaining: <b className="ml-1">{K(projectedRemaining.total)}</b></div>
-            </div>
-
-            <div className="mt-3 flex items-center gap-2">
-              <button className="ui-btn ui-btn-primary" onClick={addWithdrawal} type="button">
-                Add Withdrawal
-              </button>
-              <div className="ui-badge">Total: <b className="ml-1">{K(withdrawalManual.total)}</b></div>
-            </div>
-
-            <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-4">
-              <Card title="Withdrawals (Cash)" value={K(withdrawalManual.cash)} />
-              <Card title="Withdrawals (Till)" value={K(withdrawalManual.till)} />
-              <Card title="Withdrawals (Withdrawal)" value={K(withdrawalManual.withdrawal)} />
-              <Card title="Withdrawals (Send Money)" value={K(withdrawalManual.sendMoney)} />
-            </div>
-
-            <div className="mt-4">
-              <Table columns={withdrawalColumns} data={withdrawals} keyField="id" emptyText="No manual withdrawals" />
-            </div>
-          </>
+        {dateKeysInRange.length > 31 && (
+          <div className="ui-card p-4 text-sm text-mute">
+            <b>Note:</b> Opening values are loaded for the first <b>31</b> days only to avoid slow requests. Sales and manual withdrawals still cover the full range.
+          </div>
         )}
+
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+          <Card title="Expected Available (Cash)" value={K(expectedAvailable.cash)} subtitle="Openings + Sales - Manual" />
+          <Card title="Expected Available (Till)" value={K(expectedAvailable.till)} subtitle="Openings + Sales - Manual" />
+          <Card title="Expected Available (Withdrawal)" value={K(expectedAvailable.withdrawal)} subtitle="Openings + Sales - Manual" />
+          <Card title="Expected Available (Send Money)" value={K(expectedAvailable.sendMoney)} subtitle="Openings + Sales - Manual" />
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <div className="ui-badge">Total Expected: <b className="ml-1">{K(expectedAvailable.total)}</b></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <label className="block">
+            <span className="ui-label">Date</span>
+            <input className="ui-input mt-1" type="date" value={wDate} onChange={(e) => setWDate(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className="ui-label">Amount</span>
+            <input className="ui-input mt-1" value={wAmount} onChange={(e) => setWAmount(e.target.value)} inputMode="numeric" placeholder="0" />
+          </label>
+          <label className="block">
+            <span className="ui-label">Source</span>
+            <select className="ui-select mt-1" value={wSource} onChange={(e) => setWSource(e.target.value)}>
+              <option value="cash">Cash</option>
+              <option value="till">Till</option>
+              <option value="withdrawal">Withdrawal</option>
+              <option value="send_money">Send Money</option>
+            </select>
+          </label>
+          <label className="block md:col-span-2">
+            <span className="ui-label">Reason</span>
+            <input className="ui-input mt-1" value={wReason} onChange={(e) => setWReason(e.target.value)} placeholder="e.g. supplier payment" />
+          </label>
+        </div>
+
+        <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-4">
+          <Card title="Remaining After Entry (Cash)" value={K(projectedRemaining.cash)} subtitle="If you add this withdrawal" />
+          <Card title="Remaining After Entry (Till)" value={K(projectedRemaining.till)} subtitle="If you add this withdrawal" />
+          <Card title="Remaining After Entry (Withdrawal)" value={K(projectedRemaining.withdrawal)} subtitle="If you add this withdrawal" />
+          <Card title="Remaining After Entry (Send Money)" value={K(projectedRemaining.sendMoney)} subtitle="If you add this withdrawal" />
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <div className="ui-badge">Total Remaining: <b className="ml-1">{K(projectedRemaining.total)}</b></div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <button className="ui-btn ui-btn-primary" onClick={addWithdrawal} type="button">
+            Add Withdrawal
+          </button>
+          <div className="ui-badge">Total: <b className="ml-1">{K(withdrawalManual.total)}</b></div>
+        </div>
+
+        <div className="mt-4 grid gap-4 grid-cols-1 md:grid-cols-4">
+          <Card title="Withdrawals (Cash)" value={K(withdrawalManual.cash)} />
+          <Card title="Withdrawals (Till)" value={K(withdrawalManual.till)} />
+          <Card title="Withdrawals (Withdrawal)" value={K(withdrawalManual.withdrawal)} />
+          <Card title="Withdrawals (Send Money)" value={K(withdrawalManual.sendMoney)} />
+        </div>
+
+        <div className="mt-4">
+          <Table columns={withdrawalColumns} data={withdrawals} keyField="id" emptyText="No manual withdrawals" />
+        </div>
       </Section>
 
     </div>
