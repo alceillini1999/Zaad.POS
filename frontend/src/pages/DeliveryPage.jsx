@@ -120,6 +120,7 @@ export default function DeliveryPage() {
               <option value="cash">Cash</option>
               <option value="till">Till</option>
               <option value="withdrawal">Withdrawal</option>
+                      <option value="send_money">Send Money</option>
               <option value="sendmoney">Send Money</option>
             </select>
             <button className="ui-btn ui-btn-ghost" onClick={load} type="button">

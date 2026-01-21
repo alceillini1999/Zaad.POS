@@ -16,19 +16,48 @@ const CLIENTS_TAB = process.env.SHEET_CLIENTS_TAB || 'Clients';
 async function upsertLoyaltyPoints({ phone, nameHint, pointsDelta }) {
   try {
     if (!phone || !pointsDelta) return;
-    if (!CLIENTS_SHEET_ID) return;
+    if (!CLIENTS_SHEET_ID) return; // clients sheet optional
+
+    const digitsOnly = (s) => String(s || '').replace(/[^0-9]/g, '');
+    const target = digitsOnly(phone);
+    if (!target) return;
+
     const rows = await readRows(CLIENTS_SHEET_ID, CLIENTS_TAB, 'A2:E');
-    const idx1 = findRowIndexByKey(rows, 0, String(phone));
-    if (idx1 >= 0) {
-      const cur = rows[idx1 - 2] || [];
+
+    // Match by digits only to avoid duplicates from formats like +254..., 254..., 07...
+    let matchIdx = -1; // sheet row number (1-based)
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] || [];
+      const key = digitsOnly(r[0]);
+      if (key && key === target) {
+        matchIdx = i + 2; // because we read starting from row 2
+        break;
+      }
+    }
+
+    if (matchIdx >= 2) {
+      const cur = rows[matchIdx - 2] || [];
       const curName = cur[1] || '';
       const curAddress = cur[2] || '';
       const curPoints = Number(cur[3] || 0);
       const curNotes = cur[4] || '';
       const newPoints = Math.max(0, curPoints + Number(pointsDelta || 0));
-      await updateRow(CLIENTS_SHEET_ID, CLIENTS_TAB, idx1, [String(phone), curName || String(nameHint || phone), curAddress, newPoints, curNotes]);
+
+      await updateRow(CLIENTS_SHEET_ID, CLIENTS_TAB, matchIdx, [
+        String(cur[0] || target),
+        String(curName || nameHint || phone),
+        String(curAddress || ''),
+        Number(newPoints || 0),
+        String(curNotes || ''),
+      ]);
     } else {
-      await appendRow(CLIENTS_SHEET_ID, CLIENTS_TAB, [String(phone), String(nameHint || phone), '', Number(pointsDelta || 0), '']);
+      await appendRow(CLIENTS_SHEET_ID, CLIENTS_TAB, [
+        String(target),
+        String(nameHint || phone),
+        '',
+        Number(pointsDelta || 0),
+        '',
+      ]);
     }
   } catch (e) {
     console.error('Loyalty points update failed:', e?.message || e);
