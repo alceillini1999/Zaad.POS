@@ -100,7 +100,9 @@ function pmKey(v) {
 
 // Read last closing cash before given date (YYYY-MM-DD)
 async function getYesterdayClosing(date) {
-  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:K');
+  // Be tolerant of sheets with/without header rows.
+  // Some deployments may have data starting from row 1 (no headers).
+  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A1:K');
   let bestDate = '';
   let bestClosing = 0;
 
@@ -119,7 +121,7 @@ async function getYesterdayClosing(date) {
 
 // Find open row for date
 async function findOpenRow(date) {
-  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K');
+  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A1:K');
   const found = (rows || []).find(r => normalizeDate(r[0]) === date);
   return { rows, found };
 }
@@ -165,7 +167,8 @@ router.get('/today', async (req, res) => {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
-    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K');
+    // Accept sheets where data starts at row 1 (no headers)
+    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A1:K');
 
     const found = (rows || []).find(r => normalizeDate(r[0]) === date);
     if (!found) return res.json({ ok: true, found: false });
@@ -303,7 +306,8 @@ router.post('/open', async (req, res) => {
     const cashBreakdown = safeArr(body.cashBreakdown);
 
     // prevent duplicate open for same date
-    const existing = await readRows(SHEET_ID, OPEN_TAB, 'A2:B');
+    // Accept sheets where data starts at row 1 (no headers)
+    const existing = await readRows(SHEET_ID, OPEN_TAB, 'A1:B');
     const already = (existing || []).find(r => normalizeDate(r[0]) === date);
     if (already) {
       return res.status(409).json({ error: 'Day already opened for this date', openId: already[1] || '' });
