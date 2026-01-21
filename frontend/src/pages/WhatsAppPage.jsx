@@ -54,10 +54,14 @@ export default function WhatsAppPage() {
     return ()=>{ cancelled = true; }
   }, []);
 
-  const filtered = clients.filter(c =>
-    (c.name||"").toLowerCase().includes(q.toLowerCase()) ||
-    (c.phone||"").includes(q)
-  );
+  // Defensive: some sheet parsers may include empty rows as null/undefined.
+  const filtered = (Array.isArray(clients) ? clients : [])
+    .filter((c) => c && typeof c === 'object')
+    .filter(
+      (c) =>
+        String(c.name || '').toLowerCase().includes(String(q || '').toLowerCase()) ||
+        String(c.phone || '').includes(String(q || ''))
+    );
 
   const toggle = (phone) =>
     setSelectedClients(prev => prev.includes(phone) ? prev.filter(p=>p!==phone) : [...prev, phone]);
@@ -162,7 +166,7 @@ export default function WhatsAppPage() {
 
               <div className="max-h-80 overflow-y-auto border rounded p-2">
                 {filtered.map(c => (
-                  <label key={c._id || c.phone} className="flex items-center gap-2 py-1">
+                  <label key={c._id || c.phone || Math.random()} className="flex items-center gap-2 py-1">
                     <input 
                       type="checkbox" 
                       checked={selectedClients.includes(c.phone)} 
