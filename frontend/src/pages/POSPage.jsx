@@ -81,6 +81,13 @@ export default function POSPage() {
   // Sale type: pay now OR delivery (pay later)
   const [saleType, setSaleType] = useState("now"); // 'now' | 'delivery'
   const [deliveryNote, setDeliveryNote] = useState("");
+<<<<<<< HEAD
+=======
+
+  // Sale type: pay now OR delivery (pay later)
+  const [saleType, setSaleType] = useState("now"); // 'now' | 'delivery'
+  const [deliveryNote, setDeliveryNote] = useState("");
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
 
   // طرق الدفع: cash / till / withdrawal
   const [payment, setPayment] = useState("cash");
@@ -170,7 +177,15 @@ export default function POSPage() {
       discount: Number(discount || 0),
       total,
       profit: items.reduce((s, i) => s + (Number(i.price) - Number(i.cost)) * Number(i.qty), 0),
+<<<<<<< HEAD
       pointsEarned,
+=======
+<<<<<<< HEAD
+      pointsEarned,
+=======
+      addPoints: Number(addPoints || 0),
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
       received: saleType === "now" && payment === "cash" ? Number(received || 0) : 0,
       change: saleType === "now" && payment === "cash" ? change : 0,
     };
@@ -194,11 +209,26 @@ export default function POSPage() {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
         alert(["Delivery order created ✅", `Phone: ${normalizedPhone || "—"}`, `Items: ${items.length}`, `Total: ${K(total)}`].join("\n"));
         setCart([]);
         setDiscount(0);
         setReceived(0);
         setClientPhone("");
+<<<<<<< HEAD
+=======
+=======
+        alert(["Delivery order created ✅", `Client: ${payload.clientName || "—"}`, `Items: ${items.length}`, `Total: ${K(total)}`].join("\n"));
+        setCart([]);
+        setDiscount(0);
+        setAddPoints(0);
+        setReceived(0);
+        setClient(null);
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
         setDeliveryNote("");
         nav("/delivery");
         return;

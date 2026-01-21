@@ -4,12 +4,23 @@
 const express = require('express');
 const router = express.Router();
 const { getSheets } = require('../google/sheets');
+<<<<<<< HEAD
 const { readRows, appendRow, updateRow, findRowIndexByKey } = require('../google/sheets.repo');
+=======
+<<<<<<< HEAD
+const { readRows, appendRow, updateRow, findRowIndexByKey } = require('../google/sheets.repo');
+=======
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
 
 const SALES_SHEET_ID = process.env.SHEET_SALES_ID;
 const SALES_TAB = process.env.SHEET_SALES_TAB || 'Sales';
 const DELIVERY_TAB = process.env.SHEET_DELIVERY_TAB || 'Delivery';
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
 const CLIENTS_SHEET_ID = process.env.SHEET_CLIENTS_ID;
 const CLIENTS_TAB = process.env.SHEET_CLIENTS_TAB || 'Clients';
 
@@ -35,6 +46,11 @@ async function upsertLoyaltyPoints({ phone, nameHint, pointsDelta }) {
   }
 }
 
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
 function safeJson(s) {
   try { return JSON.parse(s); } catch { return []; }
 }
@@ -225,11 +241,20 @@ router.post('/:id/pay', async (req, res) => {
       requestBody: { values: [salePayload] },
     });
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
     // Loyalty points: 1 point per 100 KSh of TOTAL, added when the customer actually pays.
     const phone = String(order.clientPhone || '').trim();
     const pts = phone ? Math.floor(Number(order.total || 0) / 100) : 0;
     await upsertLoyaltyPoints({ phone, nameHint: order.clientName || phone, pointsDelta: pts });
 
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> 9e405ddecbb6b923c4c0bd4d12234d22cb897e4a
+>>>>>>> e1442e61be618bc7ab7c57b080e67c4ee3fc8450
     // Delete row from Delivery tab
     const meta = await sheets.spreadsheets.get({ spreadsheetId: SALES_SHEET_ID });
     const sheet = (meta.data.sheets || []).find(s => s.properties?.title === DELIVERY_TAB);
