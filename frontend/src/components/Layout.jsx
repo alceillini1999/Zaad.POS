@@ -69,6 +69,14 @@ const icons = {
       <path fill="currentColor" d="M5 4h14v2H5V4Zm0 4h14v2H5V8Zm0 4h14v2H5v-2Zm0 4h9v2H5v-2Z" />
     </svg>
   ),
+  delivery: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5">
+      <path
+        fill="currentColor"
+        d="M3 6h13v8h2.5l2.5 3.5V20h-2a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H3V6Zm2 2v10h.18a2 2 0 0 1 3.64 0H15V8H5Zm12 8h3.34L21 14h-4v2Zm-9 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm10 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+      />
+    </svg>
+  ),
   clients: (
     <svg viewBox="0 0 24 24" className="h-5 w-5">
       <path fill="currentColor" d="M12 12q-1.65 0-2.825-1.175Q8 9.65 8 8t1.175-2.825Q10.35 4 12 4t2.825 1.175Q16 6.35 16 8t-1.175 2.825Q13.65 12 12 12Zm-8 8v-1.4q0-.85.438-1.575.437-.725 1.162-1.125A14.2 14.2 0 0 1 9.05 14.65 15.8 15.8 0 0 1 12 14.4q1.525 0 2.95.25t3.45 1.25q.725.4 1.163 1.125.437.725.437 1.575V20Z" />
@@ -85,6 +93,7 @@ const NAV = [
   { to: "/overview", label: "Daily Report", key: "overview" },
   { to: "/summery", label: "Summary", key: "summary" },
   { to: "/pos", label: "POS", key: "pos" },
+  { to: "/delivery", label: "Delivery", key: "delivery" },
   { to: "/sales", label: "Sales", key: "sales" },
   { to: "/products", label: "Products", key: "products" },
   { to: "/clients", label: "Clients", key: "clients" },
