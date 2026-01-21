@@ -63,6 +63,9 @@ function rowToWithdrawal(row) {
 // GET /api/manual-withdrawals?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/', async (req, res) => {
   try {
+    // Avoid stale data across devices (browser/proxy caching)
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     const sheetId = DEFAULT_SHEET_ID;
     const tab = DEFAULT_TAB;
     await ensureTabExists(sheetId, tab);
@@ -93,6 +96,8 @@ router.get('/', async (req, res) => {
 // POST /api/manual-withdrawals
 router.post('/', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     const sheetId = DEFAULT_SHEET_ID;
     const tab = DEFAULT_TAB;
     await ensureTabExists(sheetId, tab);
@@ -119,6 +124,8 @@ router.post('/', async (req, res) => {
 // DELETE /api/manual-withdrawals/:id
 router.delete('/:id', async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     const sheetId = DEFAULT_SHEET_ID;
     const tab = DEFAULT_TAB;
     await ensureTabExists(sheetId, tab);

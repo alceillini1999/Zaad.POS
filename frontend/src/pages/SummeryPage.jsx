@@ -16,7 +16,8 @@ const url = (p) => {
 };
 
 async function api(p, opts = {}) {
-  const res = await fetch(url(p), { mode: "cors", credentials: "include", ...opts });
+  // Avoid stale data across devices (browser/proxy caching)
+  const res = await fetch(url(p), { mode: "cors", credentials: "include", cache: "no-store", ...opts });
   if (!res.ok) {
     const body = await res.text().catch(() => "(no body)");
     throw new Error(`HTTP ${res.status} ${res.statusText} @ ${url(p)}\n${body}`);
@@ -169,7 +170,8 @@ export default function SummeryPage() {
         const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
         const list = await api(`/api/manual-withdrawals?${qs}`);
         setWithdrawals(Array.isArray(list) ? list : []);
-      } catch {
+      } catch (e) {
+        console.error('Failed to load manual withdrawals:', e);
         setWithdrawals([]);
       }
     })();
