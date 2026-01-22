@@ -12,6 +12,8 @@ const bcrypt = require('bcryptjs');
 const { pathToFileURL } = require('url');
 
 const app = express();
+// Render/Proxies: trust the first proxy so secure cookies & IP work correctly
+app.set('trust proxy', 1);
 app.use(helmet());
 
 // ✅ حمّل Router سواء كان CommonJS أو ESModule (مضمون)

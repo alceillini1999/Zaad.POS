@@ -111,8 +111,21 @@ async function ensureSessionsHeader(sheets, spreadsheetId) {
     return;
   }
 
-  // Header exists (token column present): good
-  if (hasToken) return;
+  // Header exists (token column present): ensure it matches required headers
+  if (hasToken) {
+    const missing = needs.filter((h) => !norm.includes(h));
+    // If header is outdated (e.g., missing role), upgrade it in-place.
+    // Safe because sessions data is ephemeral; if you have old rows, re-login to regenerate sessions.
+    if (missing.length > 0 || row1.length < needs.length) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${SESSIONS_TAB}!A1:I1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [needs] },
+      });
+    }
+    return;
+  }
 
   // Row 1 seems to be data (no token header) -> insert a new row at top then write header
   const sheetIdNum = await getSheetIdNum(sheets, spreadsheetId, SESSIONS_TAB);
