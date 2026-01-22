@@ -140,7 +140,10 @@ router.get('/', async (req, res) => {
     const from = ymd(req.query.from) || '';
     const to = ymd(req.query.to) || '';
     // Read all (typically small) and filter in node
-    const rows = await readRows(sheetId, tab, 'A1:G');
+    // IMPORTANT: manual withdrawals sheet stores `date` as a Google Sheets date cell.
+    // If we read with UNFORMATTED_VALUE, Google returns serial numbers (e.g., 45292),
+    // which breaks YYYY-MM-DD filtering. Read formatted values instead.
+    const rows = await readRows(sheetId, tab, 'A1:G', { valueRenderOption: 'FORMATTED_VALUE' });
     const data = (rows || []).slice(1).filter(r => r && r.length); // skip header
 
     const list = data.map(rowToWithdrawal).filter(w => w.id);

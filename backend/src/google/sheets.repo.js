@@ -22,8 +22,8 @@ const rangeCache = new Map();
 const tabIdCache = new Map();
 const TAB_ID_CACHE_TTL_MS = Number(process.env.SHEETS_TABID_CACHE_TTL_MS || 60 * 60 * 1000);
 
-function cacheKey(sheetId, tab, a1Range) {
-  return `${sheetId}::${tab}::${a1Range}`;
+function cacheKey(sheetId, tab, a1Range, valueRenderOption = 'UNFORMATTED_VALUE') {
+  return `${sheetId}::${tab}::${a1Range}::${valueRenderOption}`;
 }
 
 function invalidateSheetTab(sheetId, tab) {
@@ -44,8 +44,17 @@ function invalidateSheet(sheetId) {
   }
 }
 
-async function readRows(sheetId, tab, a1Range) {
-  const key = cacheKey(sheetId, tab, a1Range);
+/**
+ * Read rows from a sheet range.
+ *
+ * NOTE: Some tabs (e.g., manual withdrawals) store dates as Google Sheets "date" cells.
+ * When valueRenderOption is UNFORMATTED_VALUE, those dates are returned as serial numbers
+ * (e.g., 45292) which breaks string-based filtering on YYYY-MM-DD. For such cases,
+ * pass valueRenderOption: 'FORMATTED_VALUE'.
+ */
+async function readRows(sheetId, tab, a1Range, opts = {}) {
+  const valueRenderOption = opts.valueRenderOption || 'UNFORMATTED_VALUE';
+  const key = cacheKey(sheetId, tab, a1Range, valueRenderOption);
   const hit = rangeCache.get(key);
   const now = Date.now();
   if (hit && (now - hit.ts) < RANGE_CACHE_TTL_MS) {
@@ -56,7 +65,7 @@ async function readRows(sheetId, tab, a1Range) {
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
     range: `${tab}!${a1Range}`,
-    valueRenderOption: 'UNFORMATTED_VALUE',
+    valueRenderOption,
   });
   const values = resp.data.values || [];
   rangeCache.set(key, { ts: now, values });
