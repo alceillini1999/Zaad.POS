@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const nav = useNavigate();
+  const { refresh } = useAuth();
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +34,11 @@ export default function Login() {
       });
 
       // Token is stored server-side in an httpOnly cookie.
-      nav("/overview");
+      // Refresh auth context so ProtectedRoute doesn't bounce back to /login.
+      const emp = await refresh();
+      if (!emp) throw new Error("Session not created. Please try again.");
+
+      nav("/overview", { replace: true });
     } catch (e2) {
       setErr(e2.message || "Login failed");
     } finally {
