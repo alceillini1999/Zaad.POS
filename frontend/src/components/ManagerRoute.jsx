@@ -1,95 +1,63 @@
-import React, { useMemo, useState } from 'react'
+import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// Simple manager gate for sensitive pages.
-// IMPORTANT: This version DOES NOT persist unlock state.
-// The user must enter the PIN every time they enter the page.
+// Role-based manager gate for sensitive pages.
+// Access is granted when the signed-in employee has role: manager / admin / owner.
+// (Role comes from employees sheet "role" column and is returned by /api/auth/me)
+
+function isManagerRole(role) {
+  const r = String(role || '').trim().toLowerCase()
+  return r === 'manager' || r === 'admin' || r === 'owner' || r === 'superadmin'
+}
 
 export default function ManagerRoute({ children }) {
   const location = useLocation()
-  const [pin, setPin] = useState('')
-  const [err, setErr] = useState('')
-  const [unlocked, setUnlocked] = useState(false)
-
-  const requiredPin = useMemo(() => {
-    // Configure this value in Render/Vite env as VITE_MANAGER_PIN
-    return (import.meta.env.VITE_MANAGER_PIN || '0000').toString()
-  }, [])
-
   const { employee, loading } = useAuth()
-  if (loading) return (
-    <div className="p-6"><div className="ui-card p-4">Loading session…</div></div>
-  )
-  if (!employee) return <Navigate to="/login" replace />
 
-  if (unlocked) return children
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="ui-card w-full max-w-lg p-6">
+          <div className="text-lg font-semibold">Loading…</div>
+          <div className="text-sm text-ink/70 mt-1">Checking access…</div>
+        </div>
+      </div>
+    )
+  }
 
-  function submit(e) {
-    e.preventDefault()
-    setErr('')
+  if (!employee) {
+    return <Navigate to="/login" replace state={{ from: location }} />
+  }
 
-    const entered = String(pin || '').trim()
-    if (!entered) {
-      setErr('Please enter the manager PIN.')
-      return
-    }
-    if (entered !== requiredPin) {
-      setErr('Wrong PIN.')
-      setPin('')
-      return
-    }
-
-    setUnlocked(true)
-    setPin('')
+  if (isManagerRole(employee.role)) {
+    return children
   }
 
   return (
-    <div className="p-6">
-      <div className="ui-card p-5 max-w-lg">
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="ui-card w-full max-w-lg p-6">
         <div className="text-lg font-semibold">Manager Access Required</div>
         <div className="text-sm text-ink/70 mt-1">
-          This page is restricted. Enter the manager PIN to continue.
+          You don&apos;t have permission to access this page.
         </div>
-        <div className="text-xs text-ink/50 mt-1">
+        <div className="text-xs text-ink/50 mt-2">
           Page: <span className="font-mono">{location.pathname}</span>
         </div>
 
-        <form onSubmit={submit} className="mt-4 space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">Manager PIN</label>
-            <input
-              className="ui-input w-full"
-              type="password"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="Enter PIN"
-            />
-            {err ? <div className="text-sm text-red-600 mt-2">{err}</div> : null}
-          </div>
+        <div className="mt-4 ui-note">
+          Ask your manager to set your role to <span className="font-mono">manager</span> in the{' '}
+          <span className="font-mono">employees</span> sheet.
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button type="submit" className="ui-btn">
-              Unlock
-            </button>
-            <button
-              type="button"
-              className="ui-btn ui-btn-ghost"
-              onClick={() => {
-                setPin('')
-                setErr('')
-              }}
-            >
-              Clear
-            </button>
-          </div>
-
-          <div className="text-xs text-ink/50">
-            You will be asked for the PIN again the next time you open this page.
-          </div>
-        </form>
+        <div className="mt-4 flex gap-2">
+          <a className="ui-btn" href="/daily-report">
+            Back
+          </a>
+          <a className="ui-btn ui-btn-ghost" href="/pos">
+            Go to POS
+          </a>
+        </div>
       </div>
     </div>
   )
