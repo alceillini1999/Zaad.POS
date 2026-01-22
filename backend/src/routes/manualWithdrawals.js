@@ -12,7 +12,37 @@ function ymd(s) {
   if (!v) return '';
   // accept ISO
   const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+
+  // accept common Google Sheets date formats like 22/01/2026 or 1/22/2026
+  const m2 = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m2) {
+    const a = parseInt(m2[1], 10);
+    const b = parseInt(m2[2], 10);
+    const y = parseInt(m2[3], 10);
+    // Disambiguate DD/MM vs MM/DD.
+    // If one side is > 12, it's the day.
+    let day = a;
+    let mon = b;
+    if (a <= 12 && b > 12) {
+      // MM/DD
+      mon = a;
+      day = b;
+    } else if (a > 12 && b <= 12) {
+      // DD/MM (already default)
+      day = a;
+      mon = b;
+    } else {
+      // both <= 12 (ambiguous) — default to DD/MM (common in KE/EG)
+      day = a;
+      mon = b;
+    }
+    const mm = String(mon).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    if (y && mon >= 1 && mon <= 12 && day >= 1 && day <= 31) return `${y}-${mm}-${dd}`;
+  }
+
+  return '';
 }
 
 async function ensureTabExists(sheetId, tabName) {
@@ -49,13 +79,20 @@ function safeJson(v, fallback) {
 }
 
 function rowToWithdrawal(row) {
+  let source = String(row[3] || '').trim().toLowerCase();
+  source = source.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (source === 'send money' || source === 'sendmoney' || source === 'send') source = 'send_money';
+  if (source === 'withdrawel') source = 'withdrawal';
+  if (source === 'mpesa withdrawal' || source === 'mpesa') source = 'withdrawal';
   return {
     id: row[0] || '',
     date: row[1] || '',
     createdAt: row[2] || '',
-    source: row[3] || '',
+    source,
     amount: Number(row[4] || 0),
     note: row[5] || '',
+    // alias for older frontend column naming
+    reason: row[5] || '',
     createdBy: row[6] || '',
   };
 }
@@ -104,7 +141,12 @@ router.post('/', async (req, res) => {
 
     const body = req.body || {};
     const date = ymd(body.date) || ymd(new Date().toISOString());
-    const source = String(body.source || '').trim();
+    // Normalize source values to match frontend expectations.
+    let source = String(body.source || '').trim().toLowerCase();
+    source = source.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (source === 'send money' || source === 'sendmoney' || source === 'send') source = 'send_money';
+    if (source === 'withdrawel') source = 'withdrawal';
+    if (source === 'mpesa withdrawal' || source === 'mpesa') source = 'withdrawal';
     const amount = Number(body.amount || 0);
     const note = String(body.note || '').trim();
     const createdBy = String(body.createdBy || body.user || '').trim();

@@ -13,6 +13,43 @@ function addHoursISO(hours) {
   return d.toISOString();
 }
 
+// Google Sheets may auto-coerce ISO strings into date/time serials depending on
+// sheet formatting. When reading back, values can be:
+// - ISO strings
+// - locale strings (e.g., "1/22/2026 11:51:08")
+// - numeric serials (e.g., 45500.5)
+function parseSheetDateToMs(v) {
+  if (v === null || v === undefined || v === "") return 0;
+
+  // Numeric serial (Google Sheets/Excel): days since 1899-12-30
+  if (typeof v === "number") {
+    return Math.round((v - 25569) * 86400 * 1000);
+  }
+
+  const s = String(v).trim();
+  if (!s) return 0;
+
+  // Numeric string serial
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (Number.isFinite(n)) return Math.round((n - 25569) * 86400 * 1000);
+  }
+
+  // Try Date.parse for ISO/locale formats
+  const t = Date.parse(s);
+  if (Number.isFinite(t)) return t;
+
+  // Try to fix a truncated ISO like "01-22T11:51:08.219Z" by prefixing current year
+  // (best-effort fallback; avoids breaking login).
+  if (/^\d{2}-\d{2}T/.test(s)) {
+    const y = new Date().getFullYear();
+    const t2 = Date.parse(`${y}-${s}`);
+    if (Number.isFinite(t2)) return t2;
+  }
+
+  return 0;
+}
+
 function getSessionsSpreadsheetId() {
   return (
     process.env.SHEET_SESSIONS_ID ||
@@ -127,8 +164,10 @@ async function createSession({
   await ensureSessionsHeader(sheets, spreadsheetId);
 
   const token = generateToken();
-  const createdAt = nowISO();
-  const expiresAt = addHoursISO(ttlHours);
+  // Prefix with apostrophe to force Google Sheets to keep the value as plain text.
+  // (Prevents date auto-coercion that can break auth validation later.)
+  const createdAt = `'${nowISO()}`;
+  const expiresAt = `'${addHoursISO(ttlHours)}`;
 
   const values = [
     [
@@ -151,7 +190,11 @@ async function createSession({
     requestBody: { values },
   });
 
-  return { token, createdAt, expiresAt };
+  return {
+    token,
+    createdAt: String(createdAt).replace(/^'+/, ""),
+    expiresAt: String(expiresAt).replace(/^'+/, ""),
+  };
 }
 
 async function getSessionByToken(token) {
@@ -200,7 +243,8 @@ function isSessionValid(session) {
 
   const expRaw =
     session.expiresAt ?? session.expiresat ?? session["expiresAt"] ?? session["expiresat"];
-  const exp = new Date(expRaw || 0).getTime();
+  // Remove any leading apostrophe if we stored as plain text
+  const exp = parseSheetDateToMs(String(expRaw ?? "").replace(/^'+/, ""));
   if (!exp) return false;
 
   return Date.now() < exp;
