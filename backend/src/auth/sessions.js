@@ -176,6 +176,7 @@ async function createSession({
       token,
       String(employeeId || ""),
       String(employeeName || ""),
+      String(role || "staff"),
       createdAt,
       expiresAt,
       "true",
@@ -186,7 +187,7 @@ async function createSession({
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${SESSIONS_TAB}!A:H`,
+    range: `${SESSIONS_TAB}!A:I`,
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values },
