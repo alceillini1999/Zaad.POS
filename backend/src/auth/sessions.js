@@ -67,6 +67,7 @@ function requiredHeaders() {
     "token",
     "employeeId",
     "employeeName",
+    "role",
     "createdAt",
     "expiresAt",
     "isActive",
@@ -88,7 +89,7 @@ async function ensureSessionsHeader(sheets, spreadsheetId) {
   // Read first row
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${SESSIONS_TAB}!A1:H1`,
+    range: `${SESSIONS_TAB}!A1:I1`,
     valueRenderOption: "UNFORMATTED_VALUE",
   });
 
@@ -103,7 +104,7 @@ async function ensureSessionsHeader(sheets, spreadsheetId) {
   if (row1.length === 0 || norm.every((x) => x === "")) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${SESSIONS_TAB}!A1:H1`,
+      range: `${SESSIONS_TAB}!A1:I1`,
       valueInputOption: "RAW",
       requestBody: { values: [needs] },
     });
@@ -136,7 +137,7 @@ async function ensureSessionsHeader(sheets, spreadsheetId) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${SESSIONS_TAB}!A1:H1`,
+    range: `${SESSIONS_TAB}!A1:I1`,
     valueInputOption: "RAW",
     requestBody: { values: [needs] },
   });
@@ -149,6 +150,7 @@ function generateToken() {
 async function createSession({
   employeeId,
   employeeName,
+  role,
   ip,
   userAgent,
   ttlHours = 12,
@@ -206,7 +208,7 @@ async function getSessionByToken(token) {
 
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${SESSIONS_TAB}!A1:H`,
+    range: `${SESSIONS_TAB}!A1:I`,
   });
 
   const rows = resp.data.values || [];

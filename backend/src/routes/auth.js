@@ -68,6 +68,7 @@ router.post("/login", async (req, res) => {
     const session = await createSession({
       employeeId: emp.id || emp.employeeid || emp.employeeId || emp.username,
       employeeName: emp.name || emp.username,
+      role: emp.role || "staff",
       ip,
       userAgent,
       ttlHours: 12,
