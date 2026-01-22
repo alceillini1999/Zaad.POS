@@ -45,12 +45,29 @@ function ymd(s) {
   return '';
 }
 
+// Cache tab existence checks to reduce Google Sheets "spreadsheets.get" reads.
+const TAB_EXISTS_TTL_MS = Number(process.env.SHEETS_TAB_EXISTS_TTL_MS || 60 * 60 * 1000);
+/** @type {Map<string, {ts:number, tabs:Set<string>}>} */
+const tabsCache = new Map();
+
 async function ensureTabExists(sheetId, tabName) {
   if (!sheetId) throw new Error('Missing sheet id (SHEET_WITHDRAWALS_ID or SHEET_SALES_ID)');
   const sheets = getSheets();
+
+  const now = Date.now();
+  const cached = tabsCache.get(sheetId);
+  if (cached && (now - cached.ts) < TAB_EXISTS_TTL_MS && cached.tabs.has(tabName)) {
+    return;
+  }
+
   const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-  const tabs = (meta.data.sheets || []).map(s => s.properties && s.properties.title).filter(Boolean);
-  if (tabs.includes(tabName)) return;
+  const tabs = new Set(
+    (meta.data.sheets || [])
+      .map(s => s.properties && s.properties.title)
+      .filter(Boolean)
+  );
+  tabsCache.set(sheetId, { ts: now, tabs });
+  if (tabs.has(tabName)) return;
 
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: sheetId,
@@ -60,6 +77,15 @@ async function ensureTabExists(sheetId, tabName) {
       ]
     }
   });
+
+  // Update cache optimistically to avoid immediate re-reads.
+  const c2 = tabsCache.get(sheetId);
+  if (c2) {
+    c2.tabs.add(tabName);
+    c2.ts = Date.now();
+  } else {
+    tabsCache.set(sheetId, { ts: Date.now(), tabs: new Set([tabName]) });
+  }
 
   // add header row
   await sheets.spreadsheets.values.update({
@@ -72,6 +98,10 @@ async function ensureTabExists(sheetId, tabName) {
       ]]
     }
   });
+
+  // Update cache
+  const after = tabsCache.get(sheetId);
+  if (after) after.tabs.add(tabName);
 }
 
 function safeJson(v, fallback) {
