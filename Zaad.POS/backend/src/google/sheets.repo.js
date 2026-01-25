@@ -1,12 +1,13 @@
 // backend/src/google/sheets.repo.js
 const { getSheets } = require('./sheets');
 
-async function readRows(sheetId, tab, a1Range) {
+async function readRows(sheetId, tab, a1Range, opts = {}) {
   const sheets = getSheets();
+  const valueRenderOption = opts.valueRenderOption || 'UNFORMATTED_VALUE';
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
     range: `${tab}!${a1Range}`,
-    valueRenderOption: 'UNFORMATTED_VALUE',
+    valueRenderOption,
   });
   return resp.data.values || [];
 }

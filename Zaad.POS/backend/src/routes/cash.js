@@ -17,6 +17,14 @@ const DEFAULT_TILL_NO = process.env.DEFAULT_TILL_NO || 'TILL-1';
 // Accept YYYY-MM-DD, or any parseable date -> YYYY-MM-DD
 function normalizeDate(v) {
   if (v == null) return '';
+  // When reading with valueRenderOption=UNFORMATTED_VALUE, Google Sheets may return
+  // DATE/DATETIME cells as serial numbers. Convert those to YYYY-MM-DD.
+  // Excel/Sheets serial day 25569 == 1970-01-01.
+  const n = Number(v);
+  if (!Number.isNaN(n) && String(v).trim() !== '' && /^[0-9]+(\.[0-9]+)?$/.test(String(v))) {
+    const ms = Math.round((n - 25569) * 86400 * 1000);
+    return new Date(ms).toISOString().slice(0, 10);
+  }
   const s = String(v).trim();
   if (!s) return '';
 
@@ -91,7 +99,7 @@ function pmKey(v) {
 
 // Read last closing cash before given date (YYYY-MM-DD)
 async function getYesterdayClosing(date) {
-  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:J');
+  const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A2:J', { valueRenderOption: 'FORMATTED_VALUE' });
   let bestDate = '';
   let bestClosing = 0;
 
@@ -110,7 +118,7 @@ async function getYesterdayClosing(date) {
 
 // Find open row for date
 async function findOpenRow(date) {
-  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
+  const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K', { valueRenderOption: 'FORMATTED_VALUE' });
   const found = (rows || []).find(r => normalizeDate(r[0]) === date);
   return { rows, found };
 }
@@ -156,7 +164,7 @@ router.get('/today', async (req, res) => {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
-    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:J');
+    const rows = await readRows(SHEET_ID, OPEN_TAB, 'A2:K', { valueRenderOption: 'FORMATTED_VALUE' });
 
     const found = (rows || []).find(r => normalizeDate(r[0]) === date);
     if (!found) return res.json({ ok: true, found: false });
@@ -165,7 +173,7 @@ router.get('/today', async (req, res) => {
       ok: true,
       found: true,
       row: {
-        date: found[0] || '',
+        date: normalizeDate(found[0]) || '',
         openId: found[1] || '',
         openedAt: found[2] || '',
         employeeId: found[3] || '',
@@ -175,6 +183,7 @@ router.get('/today', async (req, res) => {
         openingCashTotal: Number(found[7] || 0),
         cashBreakdown: safeArr(found[8]),
         sendMoney: Number(found[9] || 0),
+        openingTillTotal: Number(found[10] || 0),
       }
     });
   } catch (e) {
@@ -219,6 +228,7 @@ router.get('/summary', async (req, res) => {
         Number(openingCashTotal),// H openingCashTotal
         JSON.stringify([]),      // I cashBreakdown
         0,                       // J sendMoney
+        0,                       // K openingTillTotal
       ]);
     }
 
@@ -287,7 +297,7 @@ router.post('/open', async (req, res) => {
     const cashBreakdown = safeArr(body.cashBreakdown);
 
     // prevent duplicate open for same date
-    const existing = await readRows(SHEET_ID, OPEN_TAB, 'A2:B');
+    const existing = await readRows(SHEET_ID, OPEN_TAB, 'A2:B', { valueRenderOption: 'FORMATTED_VALUE' });
     const already = (existing || []).find(r => normalizeDate(r[0]) === date);
     if (already) {
       return res.status(409).json({ error: 'Day already opened for this date', openId: already[1] || '' });
@@ -361,6 +371,7 @@ router.post('/close', async (req, res) => {
         const openedAt = new Date().toISOString();
         await appendRow(SHEET_ID, OPEN_TAB, [
           date, newOpenId, openedAt, '', '', DEFAULT_TILL_NO, 0, Number(openingCashTotal), JSON.stringify([]),
+          0,
           0,
         ]);
       } else {
