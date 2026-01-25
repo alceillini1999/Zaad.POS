@@ -1,7 +1,7 @@
 // backend/src/routes/cash.js
 const express = require('express');
 const router = express.Router();
-const { readRows, appendRow } = require('../google/sheets.repo');
+const { readRows, appendRow, updateRow } = require('../google/sheets.repo');
 
 const SHEET_ID = process.env.SHEET_CASH_ID;
 const OPEN_TAB = process.env.SHEET_CASH_OPEN_TAB || 'CashOpen';
@@ -13,6 +13,71 @@ const SALES_TAB = process.env.SHEET_SALES_TAB || 'Sales';
 
 // Optional defaults
 const DEFAULT_TILL_NO = process.env.DEFAULT_TILL_NO || 'TILL-1';
+
+// Ensure CashOpen/CashClose tabs have headers starting at column A.
+// If a sheet was created with its header row shifted (e.g., starting at column F),
+// Google Sheets "append" can treat column F as the first column of the table and
+// will append new rows starting at F. Our code reads from column A, so the day looks
+// "not opened" and the UI can bounce back to the same page.
+//
+// We only write headers when it's safe:
+// - Row 1 is empty, OR
+// - Cell A1 is empty but other cells in row 1 have content (typical of shifted headers).
+async function ensureHeaders() {
+  if (!SHEET_ID) return;
+
+  const openHeader = [
+    'date',
+    'openId',
+    'openedAt',
+    'employeeId',
+    'employeeName',
+    'tillNo',
+    'mpesaWithdrawal',
+    'openingCashTotal',
+    'cashBreakdown',
+    'sendMoney',
+    'openingTillTotal',
+  ];
+
+  const closeHeader = [
+    'date',
+    'openId',
+    'closedAt',
+    'employeeId',
+    'employeeName',
+    'tillNo',
+    'mpesaWithdrawal',
+    'closingCashTotal',
+    'cashBreakdown',
+    'sendMoney',
+  ];
+
+  // CashOpen: A..K
+  try {
+    const r1 = (await readRows(SHEET_ID, OPEN_TAB, 'A1:K1'))?.[0] || [];
+    const a1 = String(r1[0] ?? '').trim();
+    const any = r1.some(v => String(v ?? '').trim() !== '');
+    if (!any || (a1 === '' && any)) {
+      await updateRow(SHEET_ID, OPEN_TAB, 1, openHeader);
+    }
+  } catch (e) {
+    // Non-fatal: if we can't ensure headers, proceed with normal flow.
+    console.warn('ensureHeaders CashOpen:', e?.message || e);
+  }
+
+  // CashClose: A..J
+  try {
+    const r1 = (await readRows(SHEET_ID, CLOSE_TAB, 'A1:J1'))?.[0] || [];
+    const a1 = String(r1[0] ?? '').trim();
+    const any = r1.some(v => String(v ?? '').trim() !== '');
+    if (!any || (a1 === '' && any)) {
+      await updateRow(SHEET_ID, CLOSE_TAB, 1, closeHeader);
+    }
+  } catch (e) {
+    console.warn('ensureHeaders CashClose:', e?.message || e);
+  }
+}
 
 // Accept YYYY-MM-DD, or any parseable date -> YYYY-MM-DD
 function normalizeDate(v) {
@@ -100,6 +165,7 @@ function pmKey(v) {
 
 // Read last closing cash before given date (YYYY-MM-DD)
 async function getYesterdayClosing(date) {
+  await ensureHeaders();
   // Be tolerant of sheets with/without header rows.
   // Some deployments may have data starting from row 1 (no headers).
   const rows = await readRows(SHEET_ID, CLOSE_TAB, 'A1:K');
@@ -121,6 +187,7 @@ async function getYesterdayClosing(date) {
 
 // Find open row for date
 async function findOpenRow(date) {
+  await ensureHeaders();
   const rows = await readRows(SHEET_ID, OPEN_TAB, 'A1:K');
   const found = (rows || []).find(r => normalizeDate(r[0]) === date);
   return { rows, found };
@@ -166,6 +233,10 @@ router.get('/today', async (req, res) => {
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
+    await ensureHeaders();
+
+    await ensureHeaders();
+
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
     // Accept sheets where data starts at row 1 (no headers)
     const rows = await readRows(SHEET_ID, OPEN_TAB, 'A1:K');
@@ -201,6 +272,10 @@ router.get('/today', async (req, res) => {
 router.get('/summary', async (req, res) => {
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
+
+    await ensureHeaders();
+
+    await ensureHeaders();
 
     const date = normalizeDate(req.query.date) || normalizeDate(new Date().toISOString());
 
@@ -265,6 +340,12 @@ router.get('/summary', async (req, res) => {
 router.post('/open', async (req, res) => {
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
+
+    await ensureHeaders();
+
+    await ensureHeaders();
+
+    await ensureHeaders();
 
     const body = req.body || {};
     const date = normalizeDate(body.date);
@@ -342,6 +423,12 @@ router.post('/close', async (req, res) => {
   try {
     if (!SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_CASH_ID' });
 
+    await ensureHeaders();
+
+    await ensureHeaders();
+
+    await ensureHeaders();
+
     const body = req.body || {};
     const date = normalizeDate(body.date);
     if (!date) return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
@@ -382,6 +469,7 @@ router.post('/close', async (req, res) => {
         const openedAt = new Date().toISOString();
         await appendRow(SHEET_ID, OPEN_TAB, [
           date, newOpenId, openedAt, '', '', DEFAULT_TILL_NO, 0, Number(openingCashTotal), JSON.stringify([]),
+          0,
           0,
         ]);
       } else {
