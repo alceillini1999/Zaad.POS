@@ -691,6 +691,23 @@ const withdrawalColumns = [
         ["SEND MONEY", moneyStr(vTrNetSendMoney)],
       ];
 
+      // Opening values (these are not shown as Cards in the UI, so we use the computed values).
+      const openingRows = [
+        ["OPENING CASH", moneyStr(K(openings.cash || 0))],
+        ["OPENING TILL", moneyStr(K(openings.till || 0))],
+        ["OPENING WITHDRAWEL", moneyStr(K(openings.withdrawal || 0))],
+        ["OPENING SEND MONEY", moneyStr(K(openings.sendMoney || 0))],
+      ];
+
+      const withdrawalsRows = (withdrawals || []).map((w) => [
+        esc(w.date || ""),
+        esc(w.createdAt ? new Date(w.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""),
+        esc(srcLabel(w.source)),
+        moneyStr(K(w.amount || 0)),
+        esc(w.reason || w.note || ""),
+        esc(w.createdBy || ""),
+      ]);
+
       const transfersRows = (transfers || []).map((t) => [
         esc(t.date || ""),
         methodLabel(t.from),
@@ -759,6 +776,12 @@ const withdrawalColumns = [
       <div class="sub muted mt">Manual withdrawals are amounts taken out from a method.</div>
     </div>
 
+	    <div class="card">
+	      <h2>Opening Values</h2>
+	      <table><thead><tr><th>Type</th><th>Amount</th></tr></thead><tbody>${rows2(openingRows)}</tbody></table>
+	      <div class="sub muted mt">Opening totals loaded from the cashier sheet (best-effort for the selected range).</div>
+	    </div>
+
     <div class="card">
       <h2>Transfers Net (In − Out)</h2>
       <table><thead><tr><th>Method</th><th>Net</th></tr></thead><tbody>${rows2(transferNetRows)}</tbody></table>
@@ -769,6 +792,18 @@ const withdrawalColumns = [
       <table><thead><tr><th>Method</th><th>Expected Available</th></tr></thead><tbody>${rows2(expectedRows)}</tbody></table>
       <div class="sub muted mt">Formula per method: (Openings + Sales) − (Manual + Expenses by same method) + (Net Transfers).</div>
     </div>
+
+	    <div class="card full">
+	      <h2>Manual Withdrawals History</h2>
+	      ${
+	        withdrawalsRows.length
+	          ? `<table>
+	              <thead><tr><th>Date</th><th>Time</th><th>Source</th><th>Amount</th><th>Reason</th><th>By</th></tr></thead>
+	              <tbody>${withdrawalsRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td></tr>`).join("")}</tbody>
+	            </table>`
+	          : `<div class="sub muted">No manual withdrawals in this range.</div>`
+	      }
+	    </div>
 
     <div class="card full">
       <h2>Transfers History</h2>
