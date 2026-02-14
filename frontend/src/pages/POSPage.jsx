@@ -139,6 +139,149 @@ export default function POSPage() {
     setCart((c) => c.filter((x) => x !== it));
   }
 
+  function escapeHtml(str) {
+    return String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function printInvoice(inv) {
+    // NOTE: Must be called directly from a user gesture (button click) to avoid popup blockers.
+    const w = window.open("", "_blank", "noopener,noreferrer,width=420,height=720");
+    if (!w) {
+      alert("Popup blocked. Please allow popups to print the invoice.");
+      return;
+    }
+
+    const now = new Date();
+    const dateStr = now.toLocaleString();
+
+    const itemsRows = (inv.items || [])
+      .map((it) => {
+        const qty = Number(it.qty || 0);
+        const price = Number(it.price || 0);
+        const line = qty * price;
+        return `
+          <tr>
+            <td class="name">${escapeHtml(it.name)}</td>
+            <td class="qty">${qty}</td>
+            <td class="price">${price.toFixed(0)}</td>
+            <td class="line">${line.toFixed(0)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const subtotalV = Number(inv.subtotal || 0);
+    const discountV = Number(inv.discount || 0);
+    const totalV = Number(inv.total || 0);
+    const receivedV = Number(inv.received || 0);
+    const changeV = Number(inv.change || 0);
+    const paymentMethod = String(inv.paymentMethod || "");
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Invoice ${escapeHtml(inv.invoiceNo)}</title>
+          <style>
+            :root { --ink:#111; --mute:#666; }
+            * { box-sizing: border-box; }
+            body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: var(--ink); }
+            .wrap { padding: 14px; }
+            .center { text-align: center; }
+            .brand { font-weight: 800; font-size: 18px; letter-spacing: .2px; }
+            .sub { color: var(--mute); font-size: 12px; margin-top: 2px; }
+            .meta { margin-top: 10px; font-size: 12px; }
+            .meta div { display:flex; justify-content:space-between; gap: 10px; margin: 2px 0; }
+            .hr { border-top: 1px dashed #bbb; margin: 10px 0; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { text-align: left; color: var(--mute); font-weight: 700; padding: 6px 0; border-bottom: 1px solid #eee; }
+            td { padding: 6px 0; border-bottom: 1px solid #f2f2f2; vertical-align: top; }
+            td.qty, td.price, td.line { text-align: right; white-space: nowrap; }
+            .totals { margin-top: 10px; font-size: 12px; }
+            .totals div { display:flex; justify-content:space-between; gap: 10px; margin: 3px 0; }
+            .totals .grand { font-size: 14px; font-weight: 800; }
+            .footer { margin-top: 12px; color: var(--mute); font-size: 12px; text-align: center; }
+
+            @media print {
+              @page { margin: 8mm; }
+              .no-print { display: none !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="wrap">
+            <div class="center">
+              <div class="brand">Zaad Bakery</div>
+              <div class="sub">POS Invoice</div>
+            </div>
+
+            <div class="meta">
+              <div><span>Invoice</span><span>${escapeHtml(inv.invoiceNo)}</span></div>
+              <div><span>Date</span><span>${escapeHtml(dateStr)}</span></div>
+              <div><span>Client</span><span>${escapeHtml(inv.clientPhone || "—")}</span></div>
+              <div><span>Payment</span><span>${escapeHtml(paymentMethod)}</span></div>
+            </div>
+
+            <div class="hr"></div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th style="text-align:right;">Qty</th>
+                  <th style="text-align:right;">Price</th>
+                  <th style="text-align:right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRows || "<tr><td colspan='4'>No items</td></tr>"}
+              </tbody>
+            </table>
+
+            <div class="hr"></div>
+
+            <div class="totals">
+              <div><span>Subtotal</span><span>KSh ${subtotalV.toFixed(0)}</span></div>
+              <div><span>Discount</span><span>- KSh ${discountV.toFixed(0)}</span></div>
+              <div class="grand"><span>Total</span><span>KSh ${totalV.toFixed(0)}</span></div>
+              ${paymentMethod === "cash" ? `<div><span>Received</span><span>KSh ${receivedV.toFixed(0)}</span></div>` : ""}
+              ${paymentMethod === "cash" ? `<div><span>Change</span><span>KSh ${changeV.toFixed(0)}</span></div>` : ""}
+            </div>
+
+            <div class="footer">Thank you!</div>
+            <div class="no-print" style="margin-top:10px; text-align:center;">
+              <button onclick="window.print()" style="padding:8px 14px;">Print</button>
+            </div>
+          </div>
+
+          <script>
+            // Auto-print then close
+            window.onload = () => {
+              try { window.focus(); } catch (e) {}
+              setTimeout(() => {
+                try { window.print(); } catch (e) {}
+                setTimeout(() => {
+                  try { window.close(); } catch (e) {}
+                }, 350);
+              }, 250);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
   async function confirmPurchase() {
     if (!cart.length) {
       alert("Cart is empty");
@@ -214,6 +357,10 @@ export default function POSPage() {
         const t = await res.text();
         throw new Error(t || `HTTP ${res.status}`);
       }
+
+      // Print invoice immediately after successful payment.
+      printInvoice(payload);
+
       alert(["Sale completed ✅", `Phone: ${normalizedPhone || "—"}`, `Points: ${pointsEarned}`, `Items: ${items.length}`, `Total: ${K(total)}`].join("\n"));
       setCart([]);
       setDiscount(0);
