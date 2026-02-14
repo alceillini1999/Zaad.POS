@@ -319,12 +319,31 @@ export default function SummeryPage() {
     return { cash, till, withdrawal, sendMoney };
   }, [dateKeysInRange, openMap]);
 
-  // Expected available (Opening + Sales - Manual Withdrawals)
+  // Expected available (Opening + Sales - Manual Withdrawals - Expenses by payment method)
   const expectedAvailable = useMemo(() => {
-    const cash = openings.cash + Number(totals.cashSales || 0) - Number(withdrawalManual.cash || 0);
-    const till = openings.till + Number(totals.tillSales || 0) - Number(withdrawalManual.till || 0);
-    const withdrawal = openings.withdrawal + Number(totals.withdrawalSales || 0) - Number(withdrawalManual.withdrawal || 0);
-    const sendMoney = openings.sendMoney + Number(totals.sendMoneySales || 0) - Number(withdrawalManual.sendMoney || 0);
+    const cash =
+      openings.cash +
+      Number(totals.cashSales || 0) -
+      Number(withdrawalManual.cash || 0) -
+      Number(totals.cashExpenses || 0);
+
+    const till =
+      openings.till +
+      Number(totals.tillSales || 0) -
+      Number(withdrawalManual.till || 0) -
+      Number(totals.tillExpenses || 0);
+
+    const withdrawal =
+      openings.withdrawal +
+      Number(totals.withdrawalSales || 0) -
+      Number(withdrawalManual.withdrawal || 0) -
+      Number(totals.withdrawalExpenses || 0);
+
+    const sendMoney =
+      openings.sendMoney +
+      Number(totals.sendMoneySales || 0) -
+      Number(withdrawalManual.sendMoney || 0) -
+      Number(totals.sendMoneyExpenses || 0);
     return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
   }, [openings, totals, withdrawalManual]);
 
@@ -493,10 +512,10 @@ export default function SummeryPage() {
         )}
 
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-          <Card title="Expected Available (Cash)" value={K(expectedAvailable.cash)} subtitle="Openings + Sales - Manual" />
-          <Card title="Expected Available (Till)" value={K(expectedAvailable.till)} subtitle="Openings + Sales - Manual" />
-          <Card title="Expected Available (Withdrawal)" value={K(expectedAvailable.withdrawal)} subtitle="Openings + Sales - Manual" />
-          <Card title="Expected Available (Send Money)" value={K(expectedAvailable.sendMoney)} subtitle="Openings + Sales - Manual" />
+          <Card title="Expected Available (Cash)" value={K(expectedAvailable.cash)} subtitle="(Openings + Sales) - (Manual + Expenses by Cash)" />
+          <Card title="Expected Available (Till)" value={K(expectedAvailable.till)} subtitle="(Openings + Sales) - (Manual + Expenses by Till)" />
+          <Card title="Expected Available (Withdrawal)" value={K(expectedAvailable.withdrawal)} subtitle="(Openings + Sales) - (Manual + Expenses by Withdrawal)" />
+          <Card title="Expected Available (Send Money)" value={K(expectedAvailable.sendMoney)} subtitle="(Openings + Sales) - (Manual + Expenses by Send Money)" />
         </div>
         <div className="mt-3 flex items-center gap-2">
           <div className="ui-badge">Total Expected: <b className="ml-1">{K(expectedAvailable.total)}</b></div>
