@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import Section from "../components/Section";
 import Card from "../components/Card";
 import Table from "../components/Table";
@@ -14,6 +15,25 @@ const url = (p) => {
   const path = p.startsWith("/") ? p : `/${p}`;
   return `${API_BASE}${path}`;
 };
+
+async function api(p, opts = {}) {
+  // Avoid stale data across devices (browser/proxy caching)
+  // Auth is via httpOnly cookie
+  const mergedHeaders = { ...(opts.headers || {}) };
+  const res = await fetch(url(p), {
+    mode: "cors",
+    credentials: "include",
+    cache: "no-store",
+    ...opts,
+    headers: mergedHeaders,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(no body)");
+    throw new Error(`HTTP ${res.status} ${res.statusText} @ ${url(p)}\n${body}`);
+  }
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("json") ? res.json() : res.text();
+}
 
 const K = (n) =>
   `KSh ${Number(n || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`;
@@ -51,13 +71,7 @@ const parseYMDLocal = (s) => {
 
 const fmtD = (d) => toLocalYMD(d);
 
-function getToken() {
-  try {
-    return localStorage.getItem("token") || "";
-  } catch {
-    return "";
-  }
-}
+// Auth is cookie-based
 
 async function fetchJsonWithTimeout(input, init = {}, timeoutMs = 2500) {
   const ctrl = new AbortController();
@@ -75,10 +89,24 @@ function normPM(r) {
   const raw = String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
   const s = raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   if (s === "send money" || s === "sendmoney" || s === "send") return "send_money";
-  if (s === "withdrawel") return "withdrawal"; // common misspelling
+  // common misspellings / variants
+  if (s === "withdrawel" || s === "withdrawel cash" || s.startsWith("withdrawel ")) return "withdrawal";
+  if (s === "withdrawal" || s === "withdrawal cash" || s.startsWith("withdrawal ")) return "withdrawal";
   return s;
 }
 
+
+
+function normMethodStr(v) {
+  const raw = String(v || "").trim().toLowerCase();
+  const s = raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (s === "send money" || s === "sendmoney" || s === "send") return "send_money";
+  if (s === "withdrawel" || s === "withdrawel cash" || s.startsWith("withdrawel ")) return "withdrawal";
+  if (s === "withdrawal" || s === "withdrawal cash" || s.startsWith("withdrawal ")) return "withdrawal";
+  if (s === "till") return "till";
+  if (s === "cash") return "cash";
+  return s;
+}
 function srcLabel(src) {
   switch (src) {
     case "cash":
@@ -95,6 +123,7 @@ function srcLabel(src) {
 }
 
 export default function SummeryPage() {
+  const { employee } = useAuth();
   const today = toLocalYMD(new Date());
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
@@ -114,7 +143,15 @@ export default function SummeryPage() {
   const [wReason, setWReason] = useState("");
   const [wDate, setWDate] = useState(today);
 
-  const lsKey = (prefix, dateKey) => `${prefix}:${dateKey}`;
+  // Transfers (convert money between methods) with history (range)
+  const [transfers, setTransfers] = useState([]);
+  const [tAmount, setTAmount] = useState("");
+  const [tFrom, setTFrom] = useState("withdrawal");
+  const [tTo, setTTo] = useState("cash");
+  const [tNote, setTNote] = useState("");
+  const [tDate, setTDate] = useState(today);
+
+  // Manual withdrawals are stored in Google Sheets (shared across devices)
 
   const dateKeysInRange = useMemo(() => {
     const keys = [];
@@ -153,30 +190,38 @@ export default function SummeryPage() {
   const dTo = useMemo(() => endOfDay(parseYMDLocal(toDate)), [toDate]);
   const isSingleDay = useMemo(() => dateKeysInRange.length === 1, [dateKeysInRange]);
 
-  // Load manual withdrawals for selected range (local only)
+  // Load manual withdrawals for selected range (shared via Google Sheets)
   useEffect(() => {
-    try {
-      const all = [];
-      for (const k of dateKeysInRange) {
-        const raw = localStorage.getItem(lsKey("withdrawals", k));
-        const list = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(list)) continue;
-        for (const w of list) {
-          all.push({ ...w, dateKey: w.dateKey || k });
-        }
+    (async () => {
+      try {
+        const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+        const list = await api(`/api/manual-withdrawals?${qs}`);
+        setWithdrawals(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error('Failed to load manual withdrawals:', e);
+        setWithdrawals([]);
       }
-      // newest first
-      all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setWithdrawals(all);
-    } catch {
-      setWithdrawals([]);
-    }
-  }, [dateKeysInRange]);
+    })();
+  }, [fromDate, toDate]);
+
+  // Load transfers for selected range (shared via Google Sheets)
+  useEffect(() => {
+    (async () => {
+      try {
+        const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+        const list = await api(`/api/transfers?${qs}`);
+        setTransfers(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error('Failed to load transfers:', e);
+        setTransfers([]);
+      }
+    })();
+  }, [fromDate, toDate]);
+
 
   // Load opening values from backend sheet for the selected range
   useEffect(() => {
     let cancelled = false;
-    const token = getToken();
 
     (async () => {
       setOpenInfoStatus("loading");
@@ -189,7 +234,6 @@ export default function SummeryPage() {
               const { res, data } = await fetchJsonWithTimeout(
                 url(`/api/cash/today?date=${encodeURIComponent(k)}`),
                 {
-                  headers: token ? { Authorization: `Bearer ${token}` } : undefined,
                   cache: "no-store",
                   credentials: "include",
                 },
@@ -229,21 +273,8 @@ export default function SummeryPage() {
   // Keep withdrawal date aligned with selection
   useEffect(() => {
     setWDate(toDate);
+    setTDate(toDate);
   }, [toDate]);
-
-  const readWithdrawalsForKeys = (keys) => {
-    const all = [];
-    for (const k of keys) {
-      const raw = localStorage.getItem(lsKey("withdrawals", k));
-      const list = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(list)) continue;
-      for (const w of list) {
-        all.push({ ...w, dateKey: w.dateKey || k });
-      }
-    }
-    all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return all;
-  };
 
   const totals = useMemo(() => {
     const inRange = (t) => {
@@ -252,7 +283,20 @@ export default function SummeryPage() {
     };
     const salesInRange = sales.filter((s) => inRange(s.createdAt));
     const totalSales = salesInRange.reduce((sum, r) => sum + Number(r.total || 0), 0);
-    const totalExpenses = expenses.filter((e) => inRange(e.date)).reduce((s, r) => s + Number(r.amount || 0), 0);
+    const expensesInRange = expenses.filter((e) => inRange(e.date));
+    const totalExpenses = expensesInRange.reduce((s, r) => s + Number(r.amount || 0), 0);
+
+    // Expenses by payment method (from Expenses page)
+    const cashExpenses = expensesInRange.reduce((sum, r) => (normPM(r) === "cash" ? sum + Number(r.amount || 0) : sum), 0);
+    const tillExpenses = expensesInRange.reduce((sum, r) => (normPM(r) === "till" ? sum + Number(r.amount || 0) : sum), 0);
+    const withdrawalExpenses = expensesInRange.reduce(
+      (sum, r) => (normPM(r) === "withdrawal" ? sum + Number(r.amount || 0) : sum),
+      0
+    );
+    const sendMoneyExpenses = expensesInRange.reduce(
+      (sum, r) => (normPM(r) === "send_money" ? sum + Number(r.amount || 0) : sum),
+      0
+    );
 
     const cashSales = salesInRange.reduce((sum, r) => (normPM(r) === "cash" ? sum + Number(r.total || 0) : sum), 0);
     const tillSales = salesInRange.reduce((sum, r) => (normPM(r) === "till" ? sum + Number(r.total || 0) : sum), 0);
@@ -273,6 +317,10 @@ export default function SummeryPage() {
       tillSales,
       withdrawalSales,
       sendMoneySales,
+      cashExpenses,
+      tillExpenses,
+      withdrawalExpenses,
+      sendMoneyExpenses,
       salesInRange,
     };
   }, [sales, expenses, dFrom, dTo]);
@@ -288,6 +336,27 @@ export default function SummeryPage() {
     const sendMoney = sum("send_money");
     return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
   }, [withdrawals]);
+
+
+  const transferSummary = useMemo(() => {
+    const sumOut = (m) =>
+      (transfers || []).filter(t => normMethodStr(t.from) === m).reduce((s, t) => s + Number(t.amount || 0), 0);
+    const sumIn = (m) =>
+      (transfers || []).filter(t => normMethodStr(t.to) === m).reduce((s, t) => s + Number(t.amount || 0), 0);
+
+    const cashIn = sumIn('cash'), cashOut = sumOut('cash');
+    const tillIn = sumIn('till'), tillOut = sumOut('till');
+    const withdrawalIn = sumIn('withdrawal'), withdrawalOut = sumOut('withdrawal');
+    const sendMoneyIn = sumIn('send_money'), sendMoneyOut = sumOut('send_money');
+
+    return {
+      cash: { in: cashIn, out: cashOut, net: cashIn - cashOut },
+      till: { in: tillIn, out: tillOut, net: tillIn - tillOut },
+      withdrawal: { in: withdrawalIn, out: withdrawalOut, net: withdrawalIn - withdrawalOut },
+      sendMoney: { in: sendMoneyIn, out: sendMoneyOut, net: sendMoneyIn - sendMoneyOut },
+    };
+  }, [transfers]);
+
 
   const openings = useMemo(() => {
     // Sum openings across the selected range (best-effort).
@@ -308,14 +377,37 @@ export default function SummeryPage() {
     return { cash, till, withdrawal, sendMoney };
   }, [dateKeysInRange, openMap]);
 
-  // Expected available (Opening + Sales - Manual Withdrawals)
+  // Expected available (Opening + Sales - Manual Withdrawals - Expenses by payment method)
   const expectedAvailable = useMemo(() => {
-    const cash = openings.cash + Number(totals.cashSales || 0) - Number(withdrawalManual.cash || 0);
-    const till = openings.till + Number(totals.tillSales || 0) - Number(withdrawalManual.till || 0);
-    const withdrawal = openings.withdrawal + Number(totals.withdrawalSales || 0) - Number(withdrawalManual.withdrawal || 0);
-    const sendMoney = openings.sendMoney + Number(totals.sendMoneySales || 0) - Number(withdrawalManual.sendMoney || 0);
+    const cash =
+      openings.cash +
+      Number(totals.cashSales || 0) -
+      Number(withdrawalManual.cash || 0) -
+      Number(totals.cashExpenses || 0) +
+      Number(transferSummary.cash.net || 0);
+
+    const till =
+      openings.till +
+      Number(totals.tillSales || 0) -
+      Number(withdrawalManual.till || 0) -
+      Number(totals.tillExpenses || 0) +
+      Number(transferSummary.till.net || 0);
+
+    const withdrawal =
+      openings.withdrawal +
+      Number(totals.withdrawalSales || 0) -
+      Number(withdrawalManual.withdrawal || 0) -
+      Number(totals.withdrawalExpenses || 0) +
+      Number(transferSummary.withdrawal.net || 0);
+
+    const sendMoney =
+      openings.sendMoney +
+      Number(totals.sendMoneySales || 0) -
+      Number(withdrawalManual.sendMoney || 0) -
+      Number(totals.sendMoneyExpenses || 0) +
+      Number(transferSummary.sendMoney.net || 0);
     return { cash, till, withdrawal, sendMoney, total: cash + till + withdrawal + sendMoney };
-  }, [openings, totals, withdrawalManual]);
+  }, [openings, totals, withdrawalManual, transferSummary]);
 
   const projectedRemaining = useMemo(() => {
     const n = Number(String(wAmount || "").replace(/,/g, ""));
@@ -342,62 +434,130 @@ export default function SummeryPage() {
     };
   }, [expectedAvailable, wAmount, wSource]);
 
-  const addWithdrawal = () => {
-    const n = Number(String(wAmount || "").replace(/,/g, ""));
-    if (!Number.isFinite(n) || n <= 0) {
-      alert("Please enter a valid withdrawal amount.");
-      return;
-    }
-    const k = String(wDate || "").trim();
-    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(k)) {
-      alert("Please select a valid withdrawal date.");
-      return;
-    }
-    const entry = {
-      id: `${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      dateKey: k,
-      amount: n,
-      source: wSource,
-      reason: wReason || "",
-    };
+  const addWithdrawal = async () => {
+    const k = String(wDate || today).trim(); // YYYY-MM-DD
+    const source = String(wSource || '').trim();
+    const amount = Number(wAmount || 0);
+
+    if (!source) return alert('Select source');
+    if (!amount || amount <= 0) return alert('Enter amount');
 
     try {
-      const raw = localStorage.getItem(lsKey("withdrawals", k));
-      const list = raw ? JSON.parse(raw) : [];
-      const next = Array.isArray(list) ? [entry, ...list] : [entry];
-      localStorage.setItem(lsKey("withdrawals", k), JSON.stringify(next));
-    } catch {}
+      await api('/api/manual-withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: k,
+          source,
+          amount,
+          note: wReason || '',
+          createdBy: employee?.name || employee?.username || ''
+        }),
+      });
+      const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+      const list = await api(`/api/manual-withdrawals?${qs}`);
+      setWithdrawals(Array.isArray(list) ? list : []);
+    } catch (e) {
+      alert(e.message || String(e));
+    }
 
-    // Re-read range to update UI
-    try {
-      setWithdrawals(readWithdrawalsForKeys(dateKeysInRange));
-    } catch {}
-
-    setWAmount("");
-    setWReason("");
+    setWAmount('');
+    setWReason('');
   };
 
-  const removeWithdrawal = (id) => {
-    const target = (withdrawals || []).find((w) => String(w.id) === String(id));
-    const k = target?.dateKey;
-    if (!k) {
-      setWithdrawals((prev) => (prev || []).filter((w) => w.id !== id));
-      return;
+  const removeWithdrawal = async (id) => {
+    try {
+      await api(`/api/manual-withdrawals/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+      const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+      const list = await api(`/api/manual-withdrawals?${qs}`);
+      setWithdrawals(Array.isArray(list) ? list : []);
+    } catch (e) {
+      alert(e.message || String(e));
     }
-    try {
-      const raw = localStorage.getItem(lsKey("withdrawals", k));
-      const list = raw ? JSON.parse(raw) : [];
-      const next = Array.isArray(list) ? list.filter((w) => String(w.id) !== String(id)) : [];
-      localStorage.setItem(lsKey("withdrawals", k), JSON.stringify(next));
-    } catch {}
-    try {
-      setWithdrawals(readWithdrawalsForKeys(dateKeysInRange));
-    } catch {}
   };
 
-  const withdrawalColumns = [
-    { key: "dateKey", header: "Date", render: (r) => r.dateKey || "—" },
+  
+  const reloadTransfers = async () => {
+    try {
+      const qs = new URLSearchParams({ from: fromDate, to: toDate }).toString();
+      const list = await api(`/api/transfers?${qs}`);
+      setTransfers(Array.isArray(list) ? list : []);
+    } catch (e) {
+      console.error('Failed to reload transfers:', e);
+      setTransfers([]);
+    }
+  };
+
+  const addTransfer = async () => {
+    const k = String(tDate || today).trim(); // YYYY-MM-DD
+    const from = String(tFrom || '').trim();
+    const to = String(tTo || '').trim();
+    const amount = Number(String(tAmount || '').replace(/,/g, ''));
+
+    if (!from) return alert('Select "From"');
+    if (!to) return alert('Select "To"');
+    if (normMethodStr(from) === normMethodStr(to)) return alert('From and To must be different');
+    if (!amount || amount <= 0) return alert('Enter amount');
+
+    try {
+      await api('/api/transfers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: k,
+          from,
+          to,
+          amount,
+          note: tNote || '',
+          createdBy: employee?.name || employee?.username || '',
+        }),
+      });
+      setTAmount('');
+      setTNote('');
+      await reloadTransfers();
+    } catch (e) {
+      console.error('Failed to add transfer:', e);
+      alert('Failed to add transfer');
+    }
+  };
+
+  const removeTransfer = async (id) => {
+    const ok = confirm('Remove this transfer?');
+    if (!ok) return;
+    try {
+      await api(`/api/transfers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await reloadTransfers();
+    } catch (e) {
+      console.error('Failed to remove transfer:', e);
+      alert('Failed to remove transfer');
+    }
+  };
+
+  const transferColumns = [
+    { key: 'date', header: 'Date', render: (r) => r.date || '—' },
+    {
+      key: 'createdAt',
+      header: 'Time',
+      render: (r) => new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+    { key: 'from', header: 'From', render: (r) => srcLabel(normMethodStr(r.from)) },
+    { key: 'to', header: 'To', render: (r) => srcLabel(normMethodStr(r.to)) },
+    { key: 'amount', header: 'Amount', render: (r) => K(r.amount) },
+    { key: 'note', header: 'Note', render: (r) => r.note || '—' },
+    { key: 'createdBy', header: 'By', render: (r) => r.createdBy || '—' },
+    {
+      key: 'actions',
+      header: '',
+      render: (r) => (
+        <button className="ui-btn ui-btn-ghost !px-3" onClick={() => removeTransfer(r.id)} type="button">
+          Remove
+        </button>
+      ),
+    },
+  ];
+
+const withdrawalColumns = [
+    { key: "date", header: "Date", render: (r) => r.date || "—" },
     {
       key: "createdAt",
       header: "Time",
@@ -459,6 +619,16 @@ export default function SummeryPage() {
         </div>
       </Section>
 
+      {/* Expenses by payment method */}
+      <Section title="Expenses by Payment Method" subtitle="Computed from Expenses within the selected range">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+          <Card title="CASH" value={K(totals.cashExpenses)} />
+          <Card title="WITHDRAWEL" value={K(totals.withdrawalExpenses)} />
+          <Card title="till" value={K(totals.tillExpenses)} />
+          <Card title="send money" value={K(totals.sendMoneyExpenses)} />
+        </div>
+      </Section>
+
       {/* Sales by payment method */}
       <Section title="Sales by Payment Method" subtitle="Computed from POS sales within the selected range">
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
@@ -484,10 +654,10 @@ export default function SummeryPage() {
         )}
 
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-          <Card title="Expected Available (Cash)" value={K(expectedAvailable.cash)} subtitle="Openings + Sales - Manual" />
-          <Card title="Expected Available (Till)" value={K(expectedAvailable.till)} subtitle="Openings + Sales - Manual" />
-          <Card title="Expected Available (Withdrawal)" value={K(expectedAvailable.withdrawal)} subtitle="Openings + Sales - Manual" />
-          <Card title="Expected Available (Send Money)" value={K(expectedAvailable.sendMoney)} subtitle="Openings + Sales - Manual" />
+          <Card title="Expected Available (Cash)" value={K(expectedAvailable.cash)} subtitle="(Openings + Sales) - (Manual + Expenses by Cash)" />
+          <Card title="Expected Available (Till)" value={K(expectedAvailable.till)} subtitle="(Openings + Sales) - (Manual + Expenses by Till)" />
+          <Card title="Expected Available (Withdrawal)" value={K(expectedAvailable.withdrawal)} subtitle="(Openings + Sales) - (Manual + Expenses by Withdrawal)" />
+          <Card title="Expected Available (Send Money)" value={K(expectedAvailable.sendMoney)} subtitle="(Openings + Sales) - (Manual + Expenses by Send Money)" />
         </div>
         <div className="mt-3 flex items-center gap-2">
           <div className="ui-badge">Total Expected: <b className="ml-1">{K(expectedAvailable.total)}</b></div>
@@ -545,6 +715,66 @@ export default function SummeryPage() {
           <Table columns={withdrawalColumns} data={withdrawals} keyField="id" emptyText="No manual withdrawals" />
         </div>
       </Section>
+
+
+      {/* Transfers */}
+      <Section title="Transfers" subtitle="Move money between payment methods (history is saved)">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+          <Card title="Net Transfer (Cash)" value={K(transferSummary.cash.net)} subtitle={`In ${K(transferSummary.cash.in)} • Out ${K(transferSummary.cash.out)}`} />
+          <Card title="Net Transfer (Till)" value={K(transferSummary.till.net)} subtitle={`In ${K(transferSummary.till.in)} • Out ${K(transferSummary.till.out)}`} />
+          <Card title="Net Transfer (Withdrawal)" value={K(transferSummary.withdrawal.net)} subtitle={`In ${K(transferSummary.withdrawal.in)} • Out ${K(transferSummary.withdrawal.out)}`} />
+          <Card title="Net Transfer (Send Money)" value={K(transferSummary.sendMoney.net)} subtitle={`In ${K(transferSummary.sendMoney.in)} • Out ${K(transferSummary.sendMoney.out)}`} />
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+          <label className="block">
+            <span className="ui-label">Date</span>
+            <input className="ui-input mt-1" type="date" value={tDate} onChange={(e) => setTDate(e.target.value)} />
+          </label>
+
+          <label className="block">
+            <span className="ui-label">Amount</span>
+            <input className="ui-input mt-1" value={tAmount} onChange={(e) => setTAmount(e.target.value)} inputMode="numeric" placeholder="0" />
+          </label>
+
+          <label className="block">
+            <span className="ui-label">From</span>
+            <select className="ui-select mt-1" value={tFrom} onChange={(e) => setTFrom(e.target.value)}>
+              <option value="cash">Cash</option>
+              <option value="till">Till</option>
+              <option value="withdrawal">Withdrawal</option>
+              <option value="send_money">Send Money</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="ui-label">To</span>
+            <select className="ui-select mt-1" value={tTo} onChange={(e) => setTTo(e.target.value)}>
+              <option value="cash">Cash</option>
+              <option value="till">Till</option>
+              <option value="withdrawal">Withdrawal</option>
+              <option value="send_money">Send Money</option>
+            </select>
+          </label>
+
+          <label className="block md:col-span-2">
+            <span className="ui-label">Note</span>
+            <input className="ui-input mt-1" value={tNote} onChange={(e) => setTNote(e.target.value)} placeholder="e.g. convert Mpesa to cash" />
+          </label>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <button className="ui-btn ui-btn-primary" onClick={addTransfer} type="button">
+            Add Transfer
+          </button>
+          <div className="ui-badge">Transfers count: <b className="ml-1">{(transfers || []).length}</b></div>
+        </div>
+
+        <div className="mt-4">
+          <Table columns={transferColumns} data={transfers} keyField="id" emptyText="No transfers" />
+        </div>
+      </Section>
+
 
     </div>
   );
