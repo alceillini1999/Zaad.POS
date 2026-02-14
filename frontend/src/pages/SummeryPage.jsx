@@ -265,7 +265,221 @@ export default function SummeryPage() {
       }
     })();
 
-    return () => {
+  
+  const exportPDF = async () => {
+    try {
+      const escapeHTML = (s) =>
+        String(s ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+
+      const methodLabel = (m) => {
+        const nm = normMethodStr(m);
+        if (nm === "cash") return "CASH";
+        if (nm === "till") return "TILL";
+        if (nm === "withdrawal") return "WITHDRAWEL";
+        if (nm === "send_money") return "SEND MONEY";
+        return String(m || "").toUpperCase();
+      };
+
+      // Load logo from public folder and convert to data URL (for print/PDF)
+      let logoDataUrl = "";
+      try {
+        const res = await fetch("/zaad-logo.png", { cache: "no-store" });
+        const blob = await res.blob();
+        logoDataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        logoDataUrl = "";
+      }
+
+      const fmtDate = (d) => escapeHTML(String(d || ""));
+      const money = (n) => escapeHTML(K(n));
+
+      const salesRows = [
+        ["CASH", money(totals.cashSales)],
+        ["TILL", money(totals.tillSales)],
+        ["WITHDRAWEL", money(totals.withdrawalSales)],
+        ["SEND MONEY", money(totals.sendMoneySales)],
+        ["TOTAL", money(totals.totalSales)],
+      ];
+
+      const expensesRows = [
+        ["CASH", money(totals.cashExpenses)],
+        ["TILL", money(totals.tillExpenses)],
+        ["WITHDRAWEL", money(totals.withdrawalExpenses)],
+        ["SEND MONEY", money(totals.sendMoneyExpenses)],
+        ["TOTAL", money(totals.totalExpenses)],
+      ];
+
+      const manualRows = [
+        ["CASH", money(withdrawalManual.cash)],
+        ["TILL", money(withdrawalManual.till)],
+        ["WITHDRAWEL", money(withdrawalManual.withdrawal)],
+        ["SEND MONEY", money(withdrawalManual.sendMoney)],
+        ["TOTAL", money(withdrawalManual.total)],
+      ];
+
+      const expectedRows = [
+        ["CASH", money(expectedAvailable.cash)],
+        ["TILL", money(expectedAvailable.till)],
+        ["WITHDRAWEL", money(expectedAvailable.withdrawal)],
+        ["SEND MONEY", money(expectedAvailable.sendMoney)],
+        ["TOTAL", money(expectedAvailable.total)],
+      ];
+
+      const transferNetRows = [
+        ["CASH", money(transferSummary.cash?.net || 0)],
+        ["TILL", money(transferSummary.till?.net || 0)],
+        ["WITHDRAWEL", money(transferSummary.withdrawal?.net || 0)],
+        ["SEND MONEY", money(transferSummary.sendMoney?.net || 0)],
+      ];
+
+      const transfersRows = (transfers || []).map((t) => [
+        escapeHTML(t.date || ""),
+        methodLabel(t.from),
+        methodLabel(t.to),
+        money(t.amount || 0),
+        escapeHTML(t.note || ""),
+      ]);
+
+      const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Zaad Bakery Summary</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #0F172A; }
+    .header { display:flex; align-items:center; gap:14px; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px; }
+    .logo { width: 60px; height: 60px; object-fit: contain; }
+    h1 { font-size: 18px; margin: 0; }
+    .sub { color: #64748B; font-size: 12px; margin-top: 4px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .card { border:1px solid #E2E8F0; border-radius: 10px; padding: 10px; }
+    .card h2 { font-size: 13px; margin: 0 0 8px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #E2E8F0; padding: 6px 8px; text-align: left; }
+    th { background: #F8FAFC; }
+    .kpi { display:flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+    .kpi b { font-size: 13px; }
+    .full { grid-column: 1 / -1; }
+    .mt { margin-top: 12px; }
+    .muted { color: #64748B; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    ${logoDataUrl ? `<img class="logo" src="${logoDataUrl}" />` : ""}
+    <div>
+      <h1>Zaad Bakery — Summary Report</h1>
+      <div class="sub">Date Range: <b>${fmtDate(fromDate)}</b> → <b>${fmtDate(toDate)}</b></div>
+      <div class="sub muted">Generated: ${escapeHTML(new Date().toLocaleString())}</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card full">
+      <h2>Totals</h2>
+      <div class="kpi"><span>Total Sales</span><b>${money(totals.totalSales)}</b></div>
+      <div class="kpi"><span>Total Expenses</span><b>${money(totals.totalExpenses)}</b></div>
+      <div class="kpi"><span>Net</span><b>${money(totals.netProfit)}</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Sales by Payment Method</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${salesRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Expenses by Payment Method</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${expensesRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Manual Withdrawals</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${manualRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="sub muted mt">Manual withdrawals are amounts taken out from a method.</div>
+    </div>
+
+    <div class="card">
+      <h2>Transfers Net (In − Out)</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Net</th></tr></thead>
+        <tbody>
+          ${transferNetRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <h2>Expected Available by Method</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Expected Available</th></tr></thead>
+        <tbody>
+          ${expectedRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="sub muted mt">
+        Formula per method: (Openings + Sales) − (Manual + Expenses by same method) + (Net Transfers).
+      </div>
+    </div>
+
+    <div class="card full">
+      <h2>Transfers History</h2>
+      ${transfersRows.length ? `
+      <table>
+        <thead><tr><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Note</th></tr></thead>
+        <tbody>
+          ${transfersRows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join("")}
+        </tbody>
+      </table>` : `<div class="sub muted">No transfers in this range.</div>`}
+    </div>
+  </div>
+
+  <script>
+    // Auto-open print dialog so user can "Save as PDF"
+    window.onload = () => setTimeout(() => window.print(), 250);
+  </script>
+</body>
+</html>`;
+
+      const w = window.open("", "_blank", "noopener,noreferrer");
+      if (!w) {
+        alert("Popup blocked. Please allow popups to export PDF.");
+        return;
+      }
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch (e) {
+      console.error(e);
+      alert("Could not generate PDF.");
+    }
+  };
+  return () => {
       cancelled = true;
     };
   }, [dateKeysInRange]);
@@ -611,7 +825,7 @@ const withdrawalColumns = [
       </Section>
 
       {/* Totals */}
-      <Section title="Totals" subtitle="Sales / Expenses / Net">
+      <Section title="Totals" subtitle="Sales / Expenses / Net" actions={<button className="ui-btn-primary" onClick={exportPDF}>Export PDF</button>}>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
           <Card title="Total Sales" value={K(totals.totalSales)} />
           <Card title="Total Expenses" value={K(totals.totalExpenses)} />
