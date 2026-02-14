@@ -148,13 +148,27 @@ export default function POSPage() {
       .replace(/'/g, "&#039;");
   }
 
-  function printInvoice(inv) {
-    // NOTE: Must be called directly from a user gesture (button click) to avoid popup blockers.
-    const w = window.open("", "_blank", "noopener,noreferrer,width=420,height=720");
-    if (!w) {
-      alert("Popup blocked. Please allow popups to print the invoice.");
-      return;
+  function openInvoiceWindow() {
+    // Open immediately from the user click event to avoid popup blockers.
+    const w = window.open("", "_blank", "width=420,height=720");
+    if (!w) return null;
+
+    try {
+      w.document.open();
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8"/><title>Invoice</title></head>
+        <body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:16px">
+          <div style="font-size:14px;color:#111827;font-weight:700">Preparing invoice…</div>
+          <div style="margin-top:6px;font-size:12px;color:#6b7280">If nothing prints, please allow popups for this site.</div>
+        </body></html>`);
+      w.document.close();
+    } catch (e) {
+      // ignore
     }
+    return w;
+  }
+
+  function renderAndPrintInvoice(w, inv) {
+    if (!w) return;
 
     const now = new Date();
     const dateStr = now.toLocaleString();
@@ -183,6 +197,7 @@ export default function POSPage() {
     const paymentMethod = String(inv.paymentMethod || "");
 
     const html = `
+
       <!doctype html>
       <html>
         <head>
@@ -356,12 +371,29 @@ export default function POSPage() {
           </div>
         </body>
       </html>
+    
     `;
 
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+    try {
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch (e) {
+      try {
+        w.document.body.innerHTML = `<pre style="white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;padding:16px">Invoice render error: ${escapeHtml(String(e))}</pre>`;
+      } catch (_) {}
+    }
   }
+
+  function printInvoice(inv) {
+    const w = openInvoiceWindow();
+    if (!w) {
+      alert("Popup blocked. Please allow popups to print the invoice.");
+      return;
+    }
+    renderAndPrintInvoice(w, inv);
+  }
+
 
   async function confirmPurchase() {
     if (!cart.length) {
@@ -372,6 +404,10 @@ export default function POSPage() {
       alert("Received is less than total");
       return;
     }
+
+
+    // Open invoice window immediately to avoid popup blockers
+    const invoiceWin = openInvoiceWindow();
 
     const items = cart.map((i) => ({
       barcode: i.barcode,
@@ -440,7 +476,12 @@ export default function POSPage() {
       }
 
       // Print invoice immediately after successful payment.
-      printInvoice(payload);
+      if (invoiceWin) {
+        renderAndPrintInvoice(invoiceWin, payload);
+      } else {
+        // Popup was blocked; sale is still completed.
+        alert("Popup blocked. Please allow popups to print the invoice.");
+      }
 
       alert(["Sale completed ✅", `Phone: ${normalizedPhone || "—"}`, `Points: ${pointsEarned}`, `Items: ${items.length}`, `Total: ${K(total)}`].join("\n"));
       setCart([]);
