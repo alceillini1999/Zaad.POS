@@ -42,13 +42,14 @@ export default function ExpensesPage() {
     { key:'description', title:'Description' },
     { key:'date',   title:'Date', render:r=>displayDate(r.date) },
     { key:'amount', title:'Amount', render:r=>K(r.amount) },
+    { key:'paymentMethod', title:'Payment', render:r=>String(r.paymentMethod||'') },
     { key:'notes',  title:'Notes' },
   ]
 
   function addNew(){
     setModal({
       open: true,
-      edit: { description:'', date: new Date().toISOString().slice(0,10), amount:0, category:'', notes:'' }
+      edit: { description:'', date: new Date().toISOString().slice(0,10), amount:0, category:'', notes:'', paymentMethod:'cash' }
     })
   }
 
@@ -60,6 +61,7 @@ export default function ExpensesPage() {
         amount: Number(item.amount || 0),
         category: item.category || '',
         notes: item.notes || '',
+        paymentMethod: item.paymentMethod || '',
       }
       const res = await fetch(url('/api/expenses/google'), {
         method: 'POST',
@@ -110,6 +112,18 @@ export default function ExpensesPage() {
               <input type="number" className="border border-line rounded-xl px-3 py-2 w-full" value={modal.edit.amount}
                      onChange={e=>setModal(m=>({...m, edit:{...m.edit, amount:e.target.value}}))}/>
             </label>
+            <label className="text-sm col-span-2">
+              <span className="block text-mute mb-1">Payment Method</span>
+              <select className="border border-line rounded-xl px-3 py-2 w-full"
+                      value={modal.edit.paymentMethod || 'cash'}
+                      onChange={e=>setModal(m=>({...m, edit:{...m.edit, paymentMethod:e.target.value}}))}>
+                <option value="send money">send money</option>
+                <option value="cash">cash</option>
+                <option value="till">till</option>
+                <option value="withdrawel cash">withdrawel cash</option>
+              </select>
+            </label>
+
             <label className="col-span-2 text-sm">
               <span className="block text-mute mb-1">Notes</span>
               <input className="border border-line rounded-xl px-3 py-2 w-full" value={modal.edit.notes || ''}
