@@ -737,14 +737,46 @@ const withdrawalColumns = [
 </body>
 </html>`;
 
-      const w = window.open("", "_blank", "noopener,noreferrer");
-      if (!w) {
-        alert("Popup blocked. Please allow popups to export PDF.");
-        return;
-      }
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
+      // Print-to-PDF without popups.
+      // We render the report into a hidden iframe and trigger the browser print dialog.
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.style.visibility = "hidden";
+
+      // Use srcdoc when available (Chrome supports it) to avoid cross-window popups.
+      iframe.srcdoc = html;
+      document.body.appendChild(iframe);
+
+      const cleanup = () => {
+        try {
+          iframe.remove();
+        } catch {}
+      };
+
+      iframe.onload = () => {
+        // Give the logo a moment to load.
+        const w = iframe.contentWindow;
+        if (!w) {
+          cleanup();
+          alert("Could not open print preview.");
+          return;
+        }
+        w.onafterprint = cleanup;
+        setTimeout(() => {
+          try {
+            w.focus();
+            w.print();
+          } catch {
+            cleanup();
+            alert("Could not open print preview.");
+          }
+        }, 350);
+      };
     } catch (e) {
       console.error(e);
       alert("Could not generate PDF.");
