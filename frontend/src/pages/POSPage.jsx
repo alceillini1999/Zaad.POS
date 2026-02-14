@@ -148,9 +148,23 @@ export default function POSPage() {
       .replace(/'/g, "&#039;");
   }
 
-  function printInvoice(inv) {
-    // NOTE: Must be called directly from a user gesture (button click) to avoid popup blockers.
-    const w = window.open("", "_blank", "noopener,noreferrer,width=420,height=720");
+  function openInvoiceWindow() {
+    // Open immediately on the user gesture to avoid popup blockers.
+    const w = window.open("", "_blank", "width=420,height=720");
+    if (!w) return null;
+
+    // Show a lightweight loading state so the user isn't left with a blank window.
+    try {
+      w.document.open();
+      w.document.write(`<!doctype html><html><head><meta charset="utf-8" /><title>Invoice</title></head><body style="font-family:Arial,sans-serif;padding:14px;">Preparing invoice…</body></html>`);
+      w.document.close();
+    } catch (e) {
+      // ignore
+    }
+    return w;
+  }
+
+  function renderAndPrintInvoice(w, inv) {
     if (!w) {
       alert("Popup blocked. Please allow popups to print the invoice.");
       return;
@@ -277,18 +291,38 @@ export default function POSPage() {
       </html>
     `;
 
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+    try {
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch (e) {
+      // If anything goes wrong, at least show the error in the popup.
+      try {
+        w.document.open();
+        w.document.write(
+          `<!doctype html><html><head><meta charset="utf-8" /><title>Invoice Error</title></head><body style="font-family:Arial,sans-serif;padding:14px;">Failed to render invoice.<br/><pre>${escapeHtml(
+            e?.message || String(e)
+          )}</pre></body></html>`
+        );
+        w.document.close();
+      } catch (_) {
+        // ignore
+      }
+    }
   }
 
   async function confirmPurchase() {
+    // Open invoice window immediately on click so it won't be blocked.
+    const invoiceWin = openInvoiceWindow();
+
     if (!cart.length) {
       alert("Cart is empty");
+      try { invoiceWin?.close(); } catch (e) {}
       return;
     }
     if (saleType === "now" && payment === "cash" && Number(received || 0) < total) {
       alert("Received is less than total");
+      try { invoiceWin?.close(); } catch (e) {}
       return;
     }
 
@@ -344,6 +378,7 @@ export default function POSPage() {
         setClientPhone("");
         setDeliveryNote("");
         nav("/delivery");
+        try { invoiceWin?.close(); } catch (e) {}
         return;
       }
 
@@ -359,7 +394,7 @@ export default function POSPage() {
       }
 
       // Print invoice immediately after successful payment.
-      printInvoice(payload);
+      renderAndPrintInvoice(invoiceWin, payload);
 
       alert(["Sale completed ✅", `Phone: ${normalizedPhone || "—"}`, `Points: ${pointsEarned}`, `Items: ${items.length}`, `Total: ${K(total)}`].join("\n"));
       setCart([]);
@@ -368,6 +403,7 @@ export default function POSPage() {
       setClientPhone("");
     } catch (e) {
       alert("Failed to confirm purchase:\n" + (e?.message || e));
+      try { invoiceWin?.close(); } catch (err) {}
     }
   }
 
