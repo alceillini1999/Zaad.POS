@@ -89,7 +89,9 @@ function normPM(r) {
   const raw = String(r?.paymentMethod ?? r?.payment ?? r?.method ?? "").trim().toLowerCase();
   const s = raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   if (s === "send money" || s === "sendmoney" || s === "send") return "send_money";
-  if (s === "withdrawel") return "withdrawal"; // common misspelling
+  // common misspellings / variants
+  if (s === "withdrawel" || s === "withdrawel cash" || s.startsWith("withdrawel ")) return "withdrawal";
+  if (s === "withdrawal" || s === "withdrawal cash" || s.startsWith("withdrawal ")) return "withdrawal";
   return s;
 }
 
@@ -244,7 +246,20 @@ export default function SummeryPage() {
     };
     const salesInRange = sales.filter((s) => inRange(s.createdAt));
     const totalSales = salesInRange.reduce((sum, r) => sum + Number(r.total || 0), 0);
-    const totalExpenses = expenses.filter((e) => inRange(e.date)).reduce((s, r) => s + Number(r.amount || 0), 0);
+    const expensesInRange = expenses.filter((e) => inRange(e.date));
+    const totalExpenses = expensesInRange.reduce((s, r) => s + Number(r.amount || 0), 0);
+
+    // Expenses by payment method (from Expenses page)
+    const cashExpenses = expensesInRange.reduce((sum, r) => (normPM(r) === "cash" ? sum + Number(r.amount || 0) : sum), 0);
+    const tillExpenses = expensesInRange.reduce((sum, r) => (normPM(r) === "till" ? sum + Number(r.amount || 0) : sum), 0);
+    const withdrawalExpenses = expensesInRange.reduce(
+      (sum, r) => (normPM(r) === "withdrawal" ? sum + Number(r.amount || 0) : sum),
+      0
+    );
+    const sendMoneyExpenses = expensesInRange.reduce(
+      (sum, r) => (normPM(r) === "send_money" ? sum + Number(r.amount || 0) : sum),
+      0
+    );
 
     const cashSales = salesInRange.reduce((sum, r) => (normPM(r) === "cash" ? sum + Number(r.total || 0) : sum), 0);
     const tillSales = salesInRange.reduce((sum, r) => (normPM(r) === "till" ? sum + Number(r.total || 0) : sum), 0);
@@ -265,6 +280,10 @@ export default function SummeryPage() {
       tillSales,
       withdrawalSales,
       sendMoneySales,
+      cashExpenses,
+      tillExpenses,
+      withdrawalExpenses,
+      sendMoneyExpenses,
       salesInRange,
     };
   }, [sales, expenses, dFrom, dTo]);
@@ -436,6 +455,16 @@ export default function SummeryPage() {
           <Card title="Total Sales" value={K(totals.totalSales)} />
           <Card title="Total Expenses" value={K(totals.totalExpenses)} />
           <Card title="Net Profit" value={K(totals.netProfit)} />
+        </div>
+      </Section>
+
+      {/* Expenses by payment method */}
+      <Section title="Expenses by Payment Method" subtitle="Computed from Expenses within the selected range">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
+          <Card title="CASH" value={K(totals.cashExpenses)} />
+          <Card title="WITHDRAWEL" value={K(totals.withdrawalExpenses)} />
+          <Card title="till" value={K(totals.tillExpenses)} />
+          <Card title="send money" value={K(totals.sendMoneyExpenses)} />
         </div>
       </Section>
 
