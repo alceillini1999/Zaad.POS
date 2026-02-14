@@ -587,7 +587,26 @@ const withdrawalColumns = [
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
 
-      const money = (n) => esc(K(n));
+      // Format already-rendered values (e.g. "KSh 1,501") safely.
+      const moneyStr = (s) => esc(String(s ?? "").trim() || "KSh 0");
+
+      // Read the visible Card values from the page so the PDF matches the UI exactly.
+      const getCardValue = (sectionId, title) => {
+        const root = document.getElementById(sectionId);
+        if (!root) return "KSh 0";
+        const cards = Array.from(root.querySelectorAll(".ui-card"));
+        const want = String(title || "").trim().toLowerCase();
+        for (const c of cards) {
+          const tEl = c.querySelector(".text-xs.font-bold.uppercase.tracking-wider");
+          if (!tEl) continue;
+          const t = String(tEl.textContent || "").trim().toLowerCase();
+          if (t !== want) continue;
+          const vEl = c.querySelector(".mt-2.text-2xl");
+          if (!vEl) return "KSh 0";
+          return String(vEl.textContent || "").trim() || "KSh 0";
+        }
+        return "KSh 0";
+      };
       const methodLabel = (m) => {
         const nm = normMethodStr(m);
         if (nm === "cash") return "CASH";
@@ -601,50 +620,82 @@ const withdrawalColumns = [
 
       const rows2 = (arr) => arr.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("");
 
+      // Pull visible values from the UI (per-section) so the PDF matches what you see.
+      const vTotalSales = getCardValue("sum-totals", "Total Sales");
+      const vTotalExpenses = getCardValue("sum-totals", "Total Expenses");
+      const vNetProfit = getCardValue("sum-totals", "Net Profit");
+
+      const vSalesCash = getCardValue("sum-sales-by-method", "Cash");
+      const vSalesTill = getCardValue("sum-sales-by-method", "Till");
+      const vSalesWithdrawal = getCardValue("sum-sales-by-method", "Withdrawal");
+      const vSalesSendMoney = getCardValue("sum-sales-by-method", "Send Money");
+
+      const vExpCash = getCardValue("sum-expenses-by-method", "CASH");
+      const vExpTill = getCardValue("sum-expenses-by-method", "till");
+      const vExpWithdrawal = getCardValue("sum-expenses-by-method", "WITHDRAWEL");
+      const vExpSendMoney = getCardValue("sum-expenses-by-method", "send money");
+
+      const vManCash = getCardValue("sum-manual", "Withdrawals (Cash)");
+      const vManTill = getCardValue("sum-manual", "Withdrawals (Till)");
+      const vManWithdrawal = getCardValue("sum-manual", "Withdrawals (Withdrawal)");
+      const vManSendMoney = getCardValue("sum-manual", "Withdrawals (Send Money)");
+      const vManTotal = moneyStr(K(withdrawalManual.total));
+
+      const vExpAvailCash = getCardValue("sum-manual", "Expected Available (Cash)");
+      const vExpAvailTill = getCardValue("sum-manual", "Expected Available (Till)");
+      const vExpAvailWithdrawal = getCardValue("sum-manual", "Expected Available (Withdrawal)");
+      const vExpAvailSendMoney = getCardValue("sum-manual", "Expected Available (Send Money)");
+      const vExpAvailTotal = moneyStr(K(expectedAvailable.total));
+
+      const vTrNetCash = getCardValue("sum-transfers", "Net Transfer (Cash)");
+      const vTrNetTill = getCardValue("sum-transfers", "Net Transfer (Till)");
+      const vTrNetWithdrawal = getCardValue("sum-transfers", "Net Transfer (Withdrawal)");
+      const vTrNetSendMoney = getCardValue("sum-transfers", "Net Transfer (Send Money)");
+
       const salesRows = [
-        ["CASH", money(totals.cashSales)],
-        ["TILL", money(totals.tillSales)],
-        ["WITHDRAWEL", money(totals.withdrawalSales)],
-        ["SEND MONEY", money(totals.sendMoneySales)],
-        ["TOTAL", money(totals.totalSales)],
+        ["CASH", moneyStr(vSalesCash)],
+        ["TILL", moneyStr(vSalesTill)],
+        ["WITHDRAWEL", moneyStr(vSalesWithdrawal)],
+        ["SEND MONEY", moneyStr(vSalesSendMoney)],
+        ["TOTAL", moneyStr(vTotalSales)],
       ];
 
       const expensesRows = [
-        ["CASH", money(totals.cashExpenses)],
-        ["TILL", money(totals.tillExpenses)],
-        ["WITHDRAWEL", money(totals.withdrawalExpenses)],
-        ["SEND MONEY", money(totals.sendMoneyExpenses)],
-        ["TOTAL", money(totals.totalExpenses)],
+        ["CASH", moneyStr(vExpCash)],
+        ["TILL", moneyStr(vExpTill)],
+        ["WITHDRAWEL", moneyStr(vExpWithdrawal)],
+        ["SEND MONEY", moneyStr(vExpSendMoney)],
+        ["TOTAL", moneyStr(vTotalExpenses)],
       ];
 
       const manualRows = [
-        ["CASH", money(withdrawalManual.cash)],
-        ["TILL", money(withdrawalManual.till)],
-        ["WITHDRAWEL", money(withdrawalManual.withdrawal)],
-        ["SEND MONEY", money(withdrawalManual.sendMoney)],
-        ["TOTAL", money(withdrawalManual.total)],
+        ["CASH", moneyStr(vManCash)],
+        ["TILL", moneyStr(vManTill)],
+        ["WITHDRAWEL", moneyStr(vManWithdrawal)],
+        ["SEND MONEY", moneyStr(vManSendMoney)],
+        ["TOTAL", vManTotal],
       ];
 
       const expectedRows = [
-        ["CASH", money(expectedAvailable.cash)],
-        ["TILL", money(expectedAvailable.till)],
-        ["WITHDRAWEL", money(expectedAvailable.withdrawal)],
-        ["SEND MONEY", money(expectedAvailable.sendMoney)],
-        ["TOTAL", money(expectedAvailable.total)],
+        ["CASH", moneyStr(vExpAvailCash)],
+        ["TILL", moneyStr(vExpAvailTill)],
+        ["WITHDRAWEL", moneyStr(vExpAvailWithdrawal)],
+        ["SEND MONEY", moneyStr(vExpAvailSendMoney)],
+        ["TOTAL", vExpAvailTotal],
       ];
 
       const transferNetRows = [
-        ["CASH", money(transferSummary.cash?.net || 0)],
-        ["TILL", money(transferSummary.till?.net || 0)],
-        ["WITHDRAWEL", money(transferSummary.withdrawal?.net || 0)],
-        ["SEND MONEY", money(transferSummary.sendMoney?.net || 0)],
+        ["CASH", moneyStr(vTrNetCash)],
+        ["TILL", moneyStr(vTrNetTill)],
+        ["WITHDRAWEL", moneyStr(vTrNetWithdrawal)],
+        ["SEND MONEY", moneyStr(vTrNetSendMoney)],
       ];
 
       const transfersRows = (transfers || []).map((t) => [
         esc(t.date || ""),
         methodLabel(t.from),
         methodLabel(t.to),
-        money(t.amount || 0),
+        moneyStr(K(t.amount || 0)),
         esc(t.note || ""),
       ]);
 
@@ -686,9 +737,10 @@ const withdrawalColumns = [
   <div class="grid">
     <div class="card full">
       <h2>Totals</h2>
-      <div class="kpi"><span>Total Sales</span><b>${money(totals.totalSales)}</b></div>
-      <div class="kpi"><span>Total Expenses</span><b>${money(totals.totalExpenses)}</b></div>
-      <div class="kpi"><span>Net</span><b>${money(totals.netProfit)}</b></div>
+      <div class="kpi"><span>Total Sales</span><b>${moneyStr(vTotalSales)}</b></div>
+      <div class="kpi"><span>Total Expenses</span><b>${moneyStr(vTotalExpenses)}</b></div>
+      <div class="kpi"><span>Net</span><b>${moneyStr(vNetProfit)}</b></div>
+      
     </div>
 
     <div class="card">
@@ -817,7 +869,7 @@ const withdrawalColumns = [
       </Section>
 
       {/* Totals */}
-      <Section title="Totals" subtitle="Sales / Expenses / Net" actions={<button className="ui-btn-primary" onClick={exportPDF}>Export PDF</button>}>
+      <Section sectionId="sum-totals" title="Totals" subtitle="Sales / Expenses / Net" actions={<button className="ui-btn-primary" onClick={exportPDF}>Export PDF</button>}>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
           <Card title="Total Sales" value={K(totals.totalSales)} />
           <Card title="Total Expenses" value={K(totals.totalExpenses)} />
@@ -826,7 +878,7 @@ const withdrawalColumns = [
       </Section>
 
       {/* Expenses by payment method */}
-      <Section title="Expenses by Payment Method" subtitle="Computed from Expenses within the selected range">
+      <Section sectionId="sum-expenses-by-method" title="Expenses by Payment Method" subtitle="Computed from Expenses within the selected range">
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
           <Card title="CASH" value={K(totals.cashExpenses)} />
           <Card title="WITHDRAWEL" value={K(totals.withdrawalExpenses)} />
@@ -836,7 +888,7 @@ const withdrawalColumns = [
       </Section>
 
       {/* Sales by payment method */}
-      <Section title="Sales by Payment Method" subtitle="Computed from POS sales within the selected range">
+      <Section sectionId="sum-sales-by-method" title="Sales by Payment Method" subtitle="Computed from POS sales within the selected range">
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
           <Card title="Cash" value={K(totals.cashSales)} />
           <Card title="Till" value={K(totals.tillSales)} />
@@ -846,7 +898,7 @@ const withdrawalColumns = [
       </Section>
 
       {/* Manual withdrawals */}
-      <Section title="Manual Withdrawals" subtitle="Money taken out during the day (record the source)" >
+      <Section sectionId="sum-manual" title="Manual Withdrawals" subtitle="Money taken out during the day (record the source)" >
         {(openInfoStatus === "timeout" || openInfoStatus === "error") && (
           <div className="ui-card p-4 text-sm text-mute">
             <b>Note:</b> Could not load opening values from the server ({openInfoStatus}). Expected balances may show 0 for opening amounts.
@@ -924,7 +976,7 @@ const withdrawalColumns = [
 
 
       {/* Transfers */}
-      <Section title="Transfers" subtitle="Move money between payment methods (history is saved)">
+      <Section sectionId="sum-transfers" title="Transfers" subtitle="Move money between payment methods (history is saved)">
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
           <Card title="Net Transfer (Cash)" value={K(transferSummary.cash.net)} subtitle={`In ${K(transferSummary.cash.in)} • Out ${K(transferSummary.cash.out)}`} />
           <Card title="Net Transfer (Till)" value={K(transferSummary.till.net)} subtitle={`In ${K(transferSummary.till.in)} • Out ${K(transferSummary.till.out)}`} />

@@ -3,11 +3,12 @@ export default function Section({
   subtitle,
   actions,
   children,
+  sectionId,
   className = "",
   bodyClassName = "",
 }) {
   return (
-    <section className={`ui-panel mb-6 ${className}`}>
+    <section id={sectionId} className={`ui-panel mb-6 ${className}`}>
       {(title || actions) && (
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div className="min-w-0">
