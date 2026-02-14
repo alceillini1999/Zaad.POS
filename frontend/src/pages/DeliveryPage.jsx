@@ -37,7 +37,6 @@ export default function DeliveryPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [payingId, setPayingId] = useState(null);
-  const [payMethod, setPayMethod] = useState("cash");
   const [paymentDate, setPaymentDate] = useState(() => toLocalYMD(new Date()));
 
   async function load() {
@@ -65,7 +64,7 @@ export default function DeliveryPage() {
     [rows]
   );
 
-  async function markPaid(id) {
+  async function markPaid(id, paymentMethod) {
     if (!id) return;
     const ok = confirm("Mark this delivery order as PAID?\nIt will move to Sales.");
     if (!ok) return;
@@ -74,7 +73,7 @@ export default function DeliveryPage() {
       const res = await fetch(url(`/api/delivery/${id}/pay`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethod: payMethod, paymentDate }),
+        body: JSON.stringify({ paymentMethod, paymentDate }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
@@ -85,6 +84,88 @@ export default function DeliveryPage() {
     } finally {
       setPayingId(null);
     }
+  }
+
+  const normStatus = (s) => {
+    const x = String(s || "").trim().toUpperCase();
+    if (x === "READY" || x === "DELIVERED" || x === "ORDERED" || x === "PAY") return x;
+    // Legacy values like UNPAID
+    return "ORDERED";
+  };
+
+  const primaryLabel = (r) => {
+    const st = normStatus(r?.status);
+    if (st === "ORDERED") return "Ordered";
+    if (st === "READY") return "Ready";
+    if (st === "DELIVERED") return "Delivered";
+    if (st === "PAY") return "Mark as Paid";
+    return "Ordered";
+  };
+
+  const nextStatus = (st) => {
+    if (st === "ORDERED") return "READY";
+    if (st === "READY") return "DELIVERED";
+    if (st === "DELIVERED") return "PAY";
+    return st;
+  };
+
+  const parsePaymentMethod = (raw) => {
+    const v = String(raw || "").trim().toLowerCase().replace(/\s+/g, "_");
+    if (!v) return null;
+    if (v === "1" || v === "cash") return "cash";
+    if (v === "2" || v === "till") return "till";
+    if (v === "3" || v === "withdrawal") return "withdrawal";
+    if (v === "4" || v === "sendmoney" || v === "send_money" || v === "send-money") return "sendmoney";
+    return null;
+  };
+
+  const askPaymentMethod = () => {
+    const msg =
+      "كيف استلمت المال؟\n" +
+      "اكتب رقم أو كلمة:\n" +
+      "1) cash\n2) till\n3) withdrawal\n4) sendmoney";
+    const ans = prompt(msg, "cash");
+    if (ans == null) return null;
+    const m = parsePaymentMethod(ans);
+    if (!m) {
+      alert("طريقة الدفع غير صحيحة. اكتب: cash / till / withdrawal / sendmoney");
+      return null;
+    }
+    return m;
+  };
+
+  async function updateStatus(id, status) {
+    if (!id || !status) return;
+    setPayingId(id);
+    try {
+      const res = await fetch(url(`/api/delivery/${id}/status`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setRows((prev) =>
+        prev.map((r) => (String(r.id) === String(id) ? { ...r, status: data?.status || status } : r))
+      );
+    } catch (e) {
+      alert("Failed to update status:\n" + (e?.message || e));
+    } finally {
+      setPayingId(null);
+    }
+  }
+
+  async function onPrimaryAction(r) {
+    if (!r?.id) return;
+    const st = normStatus(r.status);
+    if (st === "PAY") {
+      const method = askPaymentMethod();
+      if (!method) return;
+      await markPaid(r.id, method);
+      return;
+    }
+    const nxt = nextStatus(st);
+    if (nxt !== st) await updateStatus(r.id, nxt);
   }
 
   return (
@@ -111,18 +192,6 @@ export default function DeliveryPage() {
               onChange={(e) => setPaymentDate(e.target.value)}
               title="Payment date (the sale will be recorded on this day)"
             />
-            <select
-              className="ui-select"
-              value={payMethod}
-              onChange={(e) => setPayMethod(e.target.value)}
-              title="Default payment method when marking paid"
-            >
-              <option value="cash">Cash</option>
-              <option value="till">Till</option>
-              <option value="withdrawal">Withdrawal</option>
-                      <option value="send_money">Send Money</option>
-              <option value="sendmoney">Send Money</option>
-            </select>
             <button className="ui-btn ui-btn-ghost" onClick={load} type="button">
               Refresh
             </button>
@@ -153,11 +222,13 @@ export default function DeliveryPage() {
                   <div className="text-xl font-extrabold text-ink">{K(r.total)}</div>
                   <button
                     className="ui-btn ui-btn-primary mt-2"
-                    onClick={() => markPaid(r.id)}
+                    onClick={() => onPrimaryAction(r)}
                     disabled={String(payingId) === String(r.id)}
                     type="button"
                   >
-                    {String(payingId) === String(r.id) ? "Processing…" : "Mark as Paid"}
+                    {String(payingId) === String(r.id)
+                      ? "Processing…"
+                      : primaryLabel(r)}
                   </button>
                 </div>
               </div>

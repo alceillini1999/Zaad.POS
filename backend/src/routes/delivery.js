@@ -128,9 +128,11 @@ function rowToDelivery(row, rowIndex1Based) {
     profit: Number(row[6] || 0),
     items: row[7] ? safeJson(row[7]) : [],
     note: row[8] || '',
-    status: row[9] || 'UNPAID',
+    status: row[9] || 'ORDERED',
   };
 }
+
+const ALLOWED_STATUSES = new Set(['ORDERED', 'READY', 'DELIVERED', 'PAY']);
 
 router.get('/', async (req, res) => {
   try {
@@ -183,7 +185,7 @@ router.post('/', async (req, res) => {
       Number(profit || 0),
       JSON.stringify(items),
       String(note || ''),
-      'UNPAID',
+      'ORDERED',
     ];
 
     const sheets = getSheets();
@@ -198,6 +200,35 @@ router.post('/', async (req, res) => {
   } catch (e) {
     console.error('POST /api/delivery error:', e?.message || e);
     res.status(500).json({ error: 'Failed to create delivery order' });
+  }
+});
+
+// Update delivery workflow status (ORDERED -> READY -> DELIVERED)
+router.post('/:id/status', async (req, res) => {
+  try {
+    if (!SALES_SHEET_ID) return res.status(400).json({ error: 'Missing SHEET_SALES_ID' });
+    await ensureDeliveryTab();
+
+    const rowId = Number(req.params.id);
+    if (!Number.isFinite(rowId) || rowId < 2) return res.status(400).json({ error: 'Invalid id' });
+
+    const statusRaw = String(req.body?.status || '').trim().toUpperCase();
+    if (!ALLOWED_STATUSES.has(statusRaw)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const sheets = getSheets();
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SALES_SHEET_ID,
+      range: `${DELIVERY_TAB}!J${rowId}:J${rowId}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[statusRaw]] },
+    });
+
+    res.json({ ok: true, status: statusRaw });
+  } catch (e) {
+    console.error('POST /api/delivery/:id/status error:', e?.message || e);
+    res.status(500).json({ error: 'Failed to update status' });
   }
 });
 
