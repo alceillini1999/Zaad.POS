@@ -5,7 +5,18 @@ const { readRows, appendRow, updateRow, deleteRow } = require('../google/sheets.
 
 const SHEET_ID = process.env.SHEET_EXPENSES_ID;
 const TAB = process.env.SHEET_EXPENSES_TAB || 'Expenses';
-// Columns: A:Date | B:Description | C:Amount | D:Category | E:Notes
+// Columns: A:Date | B:Description | C:Amount | D:Category | E:Notes | F:PaymentMethod
+
+const ALLOWED_PAYMENT_METHODS = new Set([
+  'send money',
+  'cash',
+  'till',
+  'withdrawel cash',
+]);
+
+function normalizePaymentMethod(v) {
+  return String(v || '').trim().toLowerCase();
+}
 
 // ── Date normalization ──────────────────────────────────────────────
 // - Excel/Sheets serial (e.g., 45991)  -> "YYYY-MM-DD"
@@ -32,12 +43,13 @@ function rowToExpense(r){
     amount: Number(r[2] || 0),
     category: r[3] || '',
     notes: r[4] || '',
+    paymentMethod: r[5] || '',
   };
 }
 
 router.get('/', async (_req, res) => {
   try {
-    const rows = await readRows(SHEET_ID, TAB, 'A2:E'); // raw values
+    const rows = await readRows(SHEET_ID, TAB, 'A2:F'); // raw values
     res.json((rows || []).map(rowToExpense));
   } catch (e) {
     console.error('GET expenses:', e?.message || e);
@@ -47,11 +59,18 @@ router.get('/', async (_req, res) => {
 
 router.post('/google', async (req, res) => {
   try {
-    let { date, description, amount = 0, category = '', notes = '' } = req.body || {};
+    let { date, description, amount = 0, category = '', notes = '', paymentMethod = '' } = req.body || {};
     const iso = normalizeDate(date);
-    if (!iso || !description) return res.status(400).json({ error: 'date and description are required' });
 
-    await appendRow(SHEET_ID, TAB, [iso, description, Number(amount), category, notes]);
+    const pm = normalizePaymentMethod(paymentMethod);
+    if (!iso || !description) return res.status(400).json({ error: 'date and description are required' });
+    if (!ALLOWED_PAYMENT_METHODS.has(pm)) {
+      return res.status(400).json({
+        error: 'paymentMethod is required and must be one of: send money, cash, till, withdrawel cash'
+      });
+    }
+
+    await appendRow(SHEET_ID, TAB, [iso, description, Number(amount), category, notes, pm]);
     res.json({ ok: true });
   } catch (e) {
     console.error('POST expense:', e?.message || e);
@@ -65,14 +84,22 @@ router.put('/google/:date/:desc', async (req, res) => {
     const keyDate = normalizeDate(req.params.date);
     const keyDesc = req.params.desc;
 
-    const rows = await readRows(SHEET_ID, TAB, 'A2:E');
+    const rows = await readRows(SHEET_ID, TAB, 'A2:F');
     const idx = rows.findIndex(r => normalizeDate(r[0]) === keyDate && String(r[1]||'') === String(keyDesc));
     const rowIndex1 = idx >= 0 ? idx + 2 : -1;
     if (rowIndex1 < 0) return res.status(404).json({ error: 'Expense not found' });
 
-    let { date = keyDate, description = keyDesc, amount = 0, category = '', notes = '' } = req.body || {};
+    let { date = keyDate, description = keyDesc, amount = 0, category = '', notes = '', paymentMethod = '' } = req.body || {};
     const iso = normalizeDate(date);
-    await updateRow(SHEET_ID, TAB, rowIndex1, [iso, description, Number(amount), category, notes]);
+
+    const pm = normalizePaymentMethod(paymentMethod);
+    if (!ALLOWED_PAYMENT_METHODS.has(pm)) {
+      return res.status(400).json({
+        error: 'paymentMethod is required and must be one of: send money, cash, till, withdrawel cash'
+      });
+    }
+
+    await updateRow(SHEET_ID, TAB, rowIndex1, [iso, description, Number(amount), category, notes, pm]);
     res.json({ ok: true });
   } catch (e) {
     console.error('PUT expense:', e?.message || e);
@@ -85,7 +112,7 @@ router.delete('/google/:date/:desc', async (req, res) => {
     const keyDate = normalizeDate(req.params.date);
     const keyDesc = req.params.desc;
 
-    const rows = await readRows(SHEET_ID, TAB, 'A2:E');
+    const rows = await readRows(SHEET_ID, TAB, 'A2:F');
     const idx = rows.findIndex(r => normalizeDate(r[0]) === keyDate && String(r[1]||'') === String(keyDesc));
     const rowIndex1 = idx >= 0 ? idx + 2 : -1;
     if (rowIndex1 < 0) return res.status(404).json({ error: 'Expense not found' });
