@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
+import Modal from "../components/Modal";
 
 const API_ORIG = import.meta.env.VITE_API_URL || "";
 const API_BASE = (() => {
@@ -39,6 +40,12 @@ export default function DeliveryPage() {
   const [payingId, setPayingId] = useState(null);
   const [paymentDate, setPaymentDate] = useState(() => toLocalYMD(new Date()));
 
+  const [payModal, setPayModal] = useState({
+    open: false,
+    order: null,
+    method: "cash",
+  });
+
   async function load() {
     setLoading(true);
     setErr("");
@@ -66,8 +73,6 @@ export default function DeliveryPage() {
 
   async function markPaid(id, paymentMethod) {
     if (!id) return;
-    const ok = confirm("Mark this delivery order as PAID?\nIt will move to Sales.");
-    if (!ok) return;
     setPayingId(id);
     try {
       const res = await fetch(url(`/api/delivery/${id}/pay`), {
@@ -109,29 +114,20 @@ export default function DeliveryPage() {
     return st;
   };
 
-  const parsePaymentMethod = (raw) => {
-    const v = String(raw || "").trim().toLowerCase().replace(/\s+/g, "_");
-    if (!v) return null;
-    if (v === "1" || v === "cash") return "cash";
-    if (v === "2" || v === "till") return "till";
-    if (v === "3" || v === "withdrawal") return "withdrawal";
-    if (v === "4" || v === "sendmoney" || v === "send_money" || v === "send-money") return "sendmoney";
-    return null;
+  const openPayModal = (order) => {
+    setPayModal({ open: true, order, method: "cash" });
   };
 
-  const askPaymentMethod = () => {
-    const msg =
-      "كيف استلمت المال؟\n" +
-      "اكتب رقم أو كلمة:\n" +
-      "1) cash\n2) till\n3) withdrawal\n4) sendmoney";
-    const ans = prompt(msg, "cash");
-    if (ans == null) return null;
-    const m = parsePaymentMethod(ans);
-    if (!m) {
-      alert("طريقة الدفع غير صحيحة. اكتب: cash / till / withdrawal / sendmoney");
-      return null;
-    }
-    return m;
+  const closePayModal = () => {
+    setPayModal({ open: false, order: null, method: "cash" });
+  };
+
+  const confirmPay = async () => {
+    const order = payModal.order;
+    if (!order?.id) return;
+    const method = String(payModal.method || "cash");
+    closePayModal();
+    await markPaid(order.id, method);
   };
 
   async function updateStatus(id, status) {
@@ -159,9 +155,7 @@ export default function DeliveryPage() {
     if (!r?.id) return;
     const st = normStatus(r.status);
     if (st === "PAY") {
-      const method = askPaymentMethod();
-      if (!method) return;
-      await markPaid(r.id, method);
+      openPayModal(r);
       return;
     }
     const nxt = nextStatus(st);
@@ -170,6 +164,46 @@ export default function DeliveryPage() {
 
   return (
     <div className="space-y-6">
+      <Modal
+        open={payModal.open}
+        onClose={closePayModal}
+        title={"Mark as Paid"}
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 text-sm text-ink/80">
+            كيف استلمت المال؟
+          </div>
+
+          <label className="text-sm col-span-2">
+            <span className="block text-mute mb-1">Payment Method</span>
+            <select
+              className="border border-line rounded-xl px-3 py-2 w-full"
+              value={payModal.method}
+              onChange={(e) => setPayModal((m) => ({ ...m, method: e.target.value }))}
+            >
+              <option value="cash">cash</option>
+              <option value="till">till</option>
+              <option value="withdrawal">withdrawal</option>
+              <option value="sendmoney">sendmoney</option>
+            </select>
+          </label>
+
+          <div className="col-span-2 flex gap-2 justify-end">
+            <button className="ui-btn ui-btn-ghost" onClick={closePayModal} type="button">
+              Cancel
+            </button>
+            <button
+              className="ui-btn ui-btn-primary"
+              onClick={confirmPay}
+              disabled={!payModal.order?.id || String(payingId) === String(payModal.order?.id)}
+              type="button"
+            >
+              {String(payingId) === String(payModal.order?.id) ? "Processing…" : "Confirm"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="ui-h1">Delivery Orders</div>
